@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#C68A66" />
+<meta name="description" content="가본 곳에 색이 물드는 나만의 여행 지도" />
+<title>내 여행 지도</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --bg:#F1E9DC; --surface:#FDFAF4; --surface-2:#F7F0E5;
+    --ink:#3C342B; --ink-soft:#8C7F6E; --line:#E7DBC8;
+    --clay:#C68A66; --clay-deep:#B0744F;
+    --plan:#BBB2A4;
+    --spring:#E2A9B6; --summer:#86B392; --autumn:#D69A57; --winter:#9FB7C4;
+    --shadow:0 14px 40px rgba(60,45,30,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    background:var(--bg);color:var(--ink);overflow:hidden;-webkit-font-smoothing:antialiased;
+  }
+  svg{display:block}
+  .ic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;
+    stroke-linecap:round;stroke-linejoin:round}
+
+  .app{display:flex;flex-direction:column;height:100vh;max-width:520px;margin:0 auto;
+    position:relative;background:var(--surface);box-shadow:var(--shadow)}
+
+  header{padding:14px 18px 12px;background:var(--surface);z-index:600;flex:none;border-bottom:1px solid var(--line)}
+  .app-row{display:flex;align-items:center;justify-content:space-between}
+  .app-name{font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+  .app-name .dot{width:9px;height:9px;border-radius:50%;background:var(--clay)}
+  .app-name small{font-size:11px;font-weight:600;color:var(--ink-soft)}
+  .wbtns{display:flex;gap:6px}
+  .wbtn{border:1px solid var(--line);background:var(--surface-2);color:var(--ink-soft);
+    border-radius:9px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .wbtn.on{background:var(--clay);color:#fff;border-color:var(--clay)}
+  .quote{margin-top:10px;background:linear-gradient(90deg,#FBF1E8,#F6EEE0);
+    border:1px solid var(--line);border-radius:13px;padding:9px 12px;
+    font-size:12.5px;color:var(--clay-deep);font-weight:600;display:flex;align-items:center;gap:8px}
+
+  .map-wrap{flex:1;position:relative}
+  #map{position:absolute;inset:0;background:#E7DECB}
+  .leaflet-container{font-family:inherit;background:#E7DECB}
+  .weather-fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:450}
+  .weather-fx i{position:absolute;top:-12%}
+  .weather-fx.rain i{width:1.5px;height:16px;border-radius:2px;
+    background:linear-gradient(transparent,rgba(110,140,165,.55));animation:fall linear infinite}
+  .weather-fx.snow i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.85);
+    box-shadow:0 0 3px rgba(255,255,255,.6);animation:fall linear infinite}
+  @keyframes fall{to{transform:translateY(115vh)}}
+
+  .hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:500;
+    background:rgba(60,45,30,.82);color:#fff;font-size:12px;font-weight:600;
+    padding:7px 14px;border-radius:999px;pointer-events:none;white-space:nowrap;transition:opacity .4s}
+
+  .pin-dot{width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 3px 8px rgba(60,45,30,.3)}
+  .pin-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;transform:translateY(-6px)}
+  .pin-lbl{font-size:10px;font-weight:700;color:var(--ink);background:rgba(253,250,244,.9);
+    padding:1px 6px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .pin-lbl.plan{color:var(--ink-soft)}
+
+  .stats{display:flex;background:var(--surface);border-top:1px solid var(--line);padding:10px 6px;flex:none}
+  .stat{flex:1;text-align:center}
+  .stat .n{font-size:17px;font-weight:800;color:var(--clay-deep)}
+  .stat .l{font-size:10px;color:var(--ink-soft);margin-top:1px}
+  .stat + .stat{border-left:1px solid var(--line)}
+
+  .fab{position:absolute;right:16px;bottom:84px;z-index:550;width:54px;height:54px;
+    border-radius:50%;background:var(--clay);color:#fff;border:none;cursor:pointer;
+    box-shadow:0 8px 22px rgba(176,116,79,.45);display:grid;place-items:center}
+  .fab .ic{width:26px;height:26px;stroke-width:2}
+
+  .tabbar{display:flex;background:var(--surface);border-top:1px solid var(--line);padding:8px 4px 12px;flex:none}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--ink-soft);cursor:pointer}
+  .tab.on{color:var(--clay-deep)}
+  .tab.dis{opacity:.4;cursor:not-allowed}
+  .tab .badge2{font-size:8px;background:var(--surface-2);color:var(--ink-soft);border-radius:5px;padding:0 4px;margin-top:1px}
+
+  .scrim{position:fixed;inset:0;background:rgba(44,36,28,.42);z-index:900;opacity:0;pointer-events:none;transition:opacity .25s}
+  .scrim.show{opacity:1;pointer-events:auto}
+  .sheet{position:absolute;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;
+    background:var(--surface);border-radius:24px 24px 0 0;z-index:910;
+    transform:translateY(110%);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-height:88vh;display:flex;flex-direction:column}
+  .sheet.show{transform:translateY(0)}
+  .grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:10px auto 4px;flex:none}
+  .sheet-body{overflow:auto;padding:8px 22px 26px}
+  .sheet h3{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:6px 0 2px}
+  .sheet .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px}
+
+  label.fld{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin:14px 0 6px}
+  input[type=text],input[type=date],textarea,select{
+    width:100%;font-family:inherit;font-size:14px;color:var(--ink);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 13px;outline:none}
+  textarea{resize:none;height:84px;line-height:1.6}
+  input:focus,textarea:focus,select:focus{border-color:var(--clay)}
+  .seg{display:flex;gap:8px}
+  .seg .opt{flex:1;text-align:center;font-size:13px;font-weight:700;padding:11px;
+    border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink-soft);cursor:pointer}
+  .seg .opt.on{background:var(--clay);color:#fff;border-color:var(--clay)}
+  .mini-link{background:none;border:none;color:var(--clay-deep);font-size:12px;font-weight:700;
+    cursor:pointer;font-family:inherit;text-decoration:underline}
+
+  /* 위치 연관검색어 */
+  .suggest{margin-top:6px}
+  .suggest:empty{display:none}
+  .sg-item{display:flex;align-items:center;gap:9px;padding:11px 13px;background:var(--surface-2);
+    border:1px solid var(--line);cursor:pointer;font-size:13px}
+  .sg-item + .sg-item{border-top:none}
+  .sg-item:first-child{border-radius:12px 12px 0 0}
+  .sg-item:last-child{border-radius:0 0 12px 12px}
+  .sg-item:only-child{border-radius:12px}
+  .sg-item:hover{background:#FBF1E9}
+  .sg-item .ic{width:16px;height:16px;color:var(--clay);flex:none}
+  .sg-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sg-msg{padding:10px 13px;font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:12px}
+
+  .wsel{display:flex;gap:8px;flex-wrap:wrap}
+  .wsel .opt{flex:1;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;
+    font-size:11.5px;font-weight:700;padding:10px 4px;border:1px solid var(--line);
+    border-radius:12px;background:var(--surface-2);color:var(--ink-soft);cursor:pointer}
+  .wsel .opt.on{background:#EAF1F4;border-color:#bcd4de;color:#5d7f8c}
+  #wxNote{font-size:11.5px;color:var(--ink-soft);margin-top:6px}
+  .rate{display:flex;gap:4px}
+  .rate .ic{width:30px;height:30px;cursor:pointer;color:var(--line);stroke:var(--line)}
+  .rate .ic.on{color:var(--clay);stroke:var(--clay);fill:var(--clay)}
+
+  .photo-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+  .thumb{position:relative;width:66px;height:66px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .rm{position:absolute;top:3px;right:3px;width:20px;height:20px;border:none;border-radius:50%;
+    background:rgba(44,36,28,.72);cursor:pointer;display:grid;place-items:center;padding:0}
+  .thumb .rep{position:absolute;left:0;right:0;bottom:0;font-size:9px;text-align:center;
+    background:var(--clay);color:#fff;font-weight:700;padding:1px 0}
+  .photo-add{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;
+    color:var(--clay-deep);border:1px dashed #d8c7ac;border-radius:12px;padding:11px 15px;cursor:pointer;background:var(--surface-2)}
+
+  .savebtn{width:100%;margin-top:22px;background:var(--clay);color:#fff;border:none;border-radius:14px;
+    padding:15px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 8px 20px rgba(176,116,79,.3)}
+  .ghostbtn{width:100%;margin-top:10px;background:transparent;color:var(--ink-soft);
+    border:1px solid var(--line);border-radius:14px;padding:13px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer}
+
+  .det-photo-img{width:100%;height:225px;object-fit:cover;border-radius:14px;margin:2px 0 4px}
+  .det-thumbs{display:flex;gap:6px;margin-top:7px}
+  .det-thumbs img{width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 6px}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+    padding:6px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
+  .chip.weather{background:#EAF1F4;border-color:#D6E4EA;color:#5d7f8c}
+  .chip.season{background:#FBEEDD;border-color:#F0DCC0;color:#b5824a}
+  .chip.plan{background:#F0EDE6;border-color:#E2D9C9;color:#8C7F6E}
+  .stars{display:flex;gap:2px;color:var(--clay);margin:4px 0 8px}
+  .stars .ic{width:18px;height:18px}
+  .stars .ic.fill{fill:var(--clay);stroke:var(--clay)}
+  .note-box{font-size:13.5px;color:#5b5043;line-height:1.7;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:13px;padding:13px 14px;margin-top:10px;white-space:pre-wrap}
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+  .meta{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 12px}
+  .meta .ml{font-size:10px;color:var(--ink-soft)}
+  .meta .mv{font-size:13.5px;font-weight:700;margin-top:4px}
+
+  .ob-ring{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;
+    background:var(--surface-2);border:1px solid var(--line);color:var(--clay);margin:6px 0 18px}
+  .goal{display:flex;align-items:center;gap:12px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px;cursor:pointer}
+  .goal.sel{border-color:var(--clay);background:#FBF1E9}
+  .goal .gi{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+    background:var(--surface);color:var(--clay);flex:none}
+  .goal.sel .gi{background:var(--clay);color:#fff}
+  .goal .gt{font-size:14px;font-weight:700}
+  .goal .gd{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
+
+  .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;font-size:13px;font-weight:600;padding:11px 18px;border-radius:999px;
+    z-index:1000;opacity:0;transition:all .3s;pointer-events:none;max-width:86%;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  #cardStage{position:fixed;left:-99999px;top:0}
+  .share-card{width:480px;background:var(--surface);border:1px solid var(--line);border-radius:24px;overflow:hidden;font-family:inherit}
+  .sc-photo{height:300px;background-size:cover;background-position:center}
+  .sc-body{padding:22px 24px 24px}
+  .sc-chips{display:flex;gap:8px;margin-bottom:12px}
+  .sc-chips span{font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;
+    background:var(--surface-2);border:1px solid var(--line);color:var(--clay-deep)}
+  .sc-title{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .sc-date{font-size:14px;color:var(--ink-soft);margin-top:6px}
+  .sc-note{font-size:15px;color:#5b5043;line-height:1.7;margin-top:16px}
+  .sc-brand{display:flex;align-items:center;gap:8px;margin-top:22px;font-size:13px;font-weight:700;color:var(--clay-deep)}
+  .sc-brand .dot{width:9px;height:9px;border-radius:50%;background:var(--clay)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="app-row">
+      <div class="app-name"><span class="dot"></span>내 여행 지도 <small>(이름 미정)</small></div>
+      <div class="wbtns">
+        <button class="wbtn on" data-w="clear" onclick="setWeather('clear')">맑음</button>
+        <button class="wbtn" data-w="rain" onclick="setWeather('rain')">비</button>
+        <button class="wbtn" data-w="snow" onclick="setWeather('snow')">눈</button>
+      </div>
+    </div>
+    <div class="quote" id="quote">
+      <svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+      <span id="quoteText">근교도, 당신의 여행입니다.</span>
+    </div>
+  </header>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="weather-fx" id="fx"></div>
+    <div class="hint" id="hint">지도를 탭하거나 + 버튼으로 핀을 찍어보세요</div>
+    <button class="fab" onclick="quickAdd()" title="핀 추가">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="tabbar">
+    <div class="tab on"><svg class="ic" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>지도</div>
+    <div class="tab" onclick="showList()"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 10h16M9 5v14"/></svg>기록</div>
+    <div class="tab dis"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>계획<span class="badge2">2단계</span></div>
+    <div class="tab" onclick="showBadges()"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M9 14l-2 7 5-3 5 3-2-7"/></svg>성취</div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet" onclick="event.stopPropagation()">
+  <div class="grab"></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="cardStage"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+/* ---------------- 상태 ---------------- */
+const KEY='tmap_state_v1';
+const QUOTES=[
+  '근교도, 당신의 여행입니다.',
+  '거창하지 않아도 좋아요. 오늘의 발걸음을 남겨요.',
+  '비 오던 그날의 색은, 맑던 날과 다르니까요.',
+  '이번 주말, 가까운 어딘가는 어때요?',
+  '지도가 천천히, 당신의 색으로 물들어요.',
+  '한 곳 한 곳이 모여 나만의 지도가 됩니다.'
+];
+const SEASON_COLOR={spring:'#E2A9B6',summer:'#86B392',autumn:'#D69A57',winter:'#9FB7C4'};
+const SEASON_KO={spring:'봄',summer:'여름',autumn:'가을',winter:'겨울'};
+const WEATHER_KO={clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'};
+
+let state=load();
+let map, markers={}, pendingLatLng=null, currentWeather='clear';
+let editingId=null, formPhotos=[], formData={type:'record',weather:'clear',rating:0};
+let suggestList=[], locTimer=null;
+
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.pins) return s;}catch(e){}
+  return {goal:null, onboarded:false, pins:seed()};
+}
+function save(){
+  try{ localStorage.setItem(KEY,JSON.stringify(state)); }
+  catch(e){ toast('저장 공간이 부족해요 — 사진 수를 줄여보세요'); }
+}
+function seed(){
+  return [
+    {id:1,name:'강릉 바다 나들이',locName:'강릉 안목해변',lat:37.7726,lng:128.9470,type:'record',date:'2024-11-18',weather:'rain',mood:'차분했던',rating:4,who:'혼자',days:'1박 2일',food:'바다라떼·물회',note:'비가 와서 카페에 오래 앉아 있었다. 파도 소리랑 빗소리가 섞이는 게 좋았다.',photos:[]},
+    {id:2,name:'전주 골목 산책',locName:'전주 한옥마을',lat:35.8150,lng:127.1530,type:'record',date:'2024-06-07',weather:'clear',mood:'좋았던',rating:5,who:'친구',days:'당일',food:'비빔밥·콩나물국밥',note:'골목골목 걷는 게 좋았다.',photos:[]},
+    {id:3,name:'가을 북촌 걷기',locName:'북촌 한옥길',lat:37.5826,lng:126.9850,type:'record',date:'2024-10-03',weather:'clear',mood:'평화로운',rating:4,who:'가족',days:'당일',food:'전통차',note:'',photos:[]},
+    {id:4,name:'제주 겨울바다',locName:'제주',lat:33.3617,lng:126.5292,type:'plan',note:'겨울 바다 보러',photos:[]},
+  ];
+}
+function seasonOf(dateStr){
+  const m=dateStr?(new Date(dateStr).getMonth()+1):(new Date().getMonth()+1);
+  if(m>=3&&m<=5)return'spring'; if(m>=6&&m<=8)return'summer';
+  if(m>=9&&m<=11)return'autumn'; return'winter';
+}
+
+/* ---------------- 지도 ---------------- */
+function initMap(){
+  map=L.map('map',{zoomControl:true,attributionControl:false}).setView([36.3,127.8],7);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd'}).addTo(map);
+  map.on('click',e=>openAddForm(e.latlng));
+  renderPins();
+}
+function renderPins(){
+  Object.values(markers).forEach(m=>map.removeLayer(m)); markers={};
+  state.pins.forEach(p=>{
+    const c=p.type==='plan'?'#BBB2A4':SEASON_COLOR[seasonOf(p.date)];
+    const big=p.type==='record'?'width:22px;height:22px':'';
+    const icon=L.divIcon({className:'',html:
+      `<div class="pin-wrap"><div class="pin-dot" style="background:${c};${big}"></div>
+       <div class="pin-lbl ${p.type==='plan'?'plan':''}">${esc(p.name)}</div></div>`,
+      iconSize:[80,38],iconAnchor:[40,30]});
+    const mk=L.marker([p.lat,p.lng],{icon}).addTo(map);
+    mk.on('click',ev=>{L.DomEvent.stopPropagation(ev); openDetail(p.id);});
+    markers[p.id]=mk;
+  });
+  renderStats(); hideHintIfAny();
+}
+
+/* ---------------- 통계 / 배지 ---------------- */
+function renderStats(){
+  const recs=state.pins.filter(p=>p.type==='record');
+  const regions=new Set(recs.map(regionGuess));
+  const weathers=new Set(recs.map(p=>p.weather).filter(Boolean));
+  const badges=computeBadges().filter(b=>b.got).length;
+  document.getElementById('stats').innerHTML=
+    stat(recs.length,'기록한 곳')+stat(regions.size,'방문 지역')+stat(weathers.size,'모은 날씨')+stat(badges,'배지');
+}
+const stat=(n,l)=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+function regionGuess(p){
+  if(p.lat>37.3&&p.lng<127.3)return'서울·경기';
+  if(p.lat>37.0&&p.lng>128)return'강원';
+  if(p.lat<34)return'제주';
+  if(p.lng<127)return'전라';
+  if(p.lat<36)return'경상';
+  return'충청';
+}
+function computeBadges(){
+  const recs=state.pins.filter(p=>p.type==='record');
+  const weathers=new Set(recs.map(p=>p.weather));
+  const regions=new Set(recs.map(regionGuess));
+  const seasons=new Set(recs.map(p=>seasonOf(p.date)));
+  return [
+    {name:'비 수집가',desc:'비 오는 날 기록',got:weathers.has('rain'),ic:'<path d="M6 14a4 4 0 0 1 1-7.9A5 5 0 0 1 17 7a3.5 3.5 0 0 1 0 7H6z"/><path d="M9 18l-1 2M13 18l-1 2"/>'},
+    {name:'눈의 추억',desc:'눈 오는 날 기록',got:weathers.has('snow'),ic:'<path d="M12 2v20M2 12h20M5 5l14 14M19 5 5 19"/>'},
+    {name:'3지역 정복',desc:'서로 다른 지역 3곳',got:regions.size>=3,ic:'<path d="M2 12h6M16 12h6M12 2v6M12 16v6"/><circle cx="12" cy="12" r="3"/>'},
+    {name:'사계절',desc:'네 계절 모두 기록',got:seasons.size>=4,ic:'<circle cx="12" cy="9" r="5"/><path d="M9 14l-2 7 5-3 5 3-2-7"/>'},
+    {name:'첫 발걸음',desc:'첫 기록 남기기',got:recs.length>=1,ic:'<path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/>'},
+    {name:'열 곳의 추억',desc:'10곳 이상 기록',got:recs.length>=10,ic:'<path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/>'},
+  ];
+}
+
+/* ---------------- 시트 ---------------- */
+function openSheet(html){
+  document.getElementById('sheetBody').innerHTML=html;
+  document.getElementById('sheetBody').scrollTop=0;
+  document.getElementById('scrim').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+}
+function closeSheet(){
+  document.getElementById('scrim').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show');
+  pendingLatLng=null;
+}
+
+/* ---- 핀 추가/수정 폼 ---- */
+function quickAdd(){ openAddForm(map.getCenter()); }
+function openAddForm(latlng, editId){
+  pendingLatLng=latlng;
+  editingId = (editId!=null)?editId:null;
+  suggestList=[];
+  const ex = editingId!=null ? state.pins.find(x=>x.id===editingId) : null;
+  formData={type:ex?ex.type:'record', weather:(ex&&ex.weather)?ex.weather:'clear', rating:ex?(ex.rating||0):0};
+  formPhotos = (ex&&ex.photos)?ex.photos.slice():[];
+  const today = (ex&&ex.date)?ex.date:new Date().toISOString().slice(0,10);
+  const v=ex||{};
+  const title = editingId!=null ? '기억 수정하기' : '이곳에 기억 남기기';
+  openSheet(`
+    <h3>${title}</h3>
+
+    <label class="fld">어떤 핀인가요?</label>
+    <div class="seg" id="typeSeg">
+      <div class="opt on" data-t="record" onclick="pickType('record')">다녀온 곳 · 기록</div>
+      <div class="opt" data-t="plan" onclick="pickType('plan')">가고 싶은 곳 · 계획</div>
+    </div>
+
+    <label class="fld">여행 이름</label>
+    <input type="text" id="f_name" value="${esc(v.name||'')}" placeholder="예) 혼자 떠난 가을 강릉" />
+
+    <label class="fld">위치 — 검색해서 골라요</label>
+    <input type="text" id="f_loc" value="${esc(v.locName||'')}" placeholder="예) 서귀포시, 강릉 안목해변" autocomplete="off" oninput="onLocInput()" onkeydown="if(event.key==='Enter')event.preventDefault()" />
+    <div class="suggest" id="suggest"></div>
+    <div class="sub" id="geoNote" style="margin-top:7px">위치를 입력하면 아래에 후보가 떠요. 하나 골라주세요. (지도를 직접 탭해도 됩니다)</div>
+
+    <div id="recordFields">
+      <label class="fld">사진 — 대표 1장 + 더보기</label>
+      <div class="photo-row" id="photoRow"></div>
+      <label class="photo-add">
+        <input type="file" accept="image/*" multiple onchange="handlePhotos(this)" hidden>
+        <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3.2"/><path d="M8 6l1.2-2h5.6L16 6"/></svg>
+        사진 추가
+      </label>
+
+      <label class="fld">언제 다녀왔나요?</label>
+      <input type="date" id="f_date" value="${today}" onchange="syncSeason();autoWeather(false)" />
+      <div class="sub" id="seasonHint" style="margin-top:6px"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+        <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">그날의 날씨</span>
+        <button type="button" class="mini-link" onclick="autoWeather(true)">자동 조회</button>
+      </div>
+      <div class="wsel" id="wsel" style="margin-top:6px">
+        ${wopt('clear','맑음')}${wopt('cloudy','흐림')}${wopt('rain','비')}${wopt('snow','눈')}
+      </div>
+      <div id="wxNote"></div>
+
+      <label class="fld">그날의 기분 · 별점</label>
+      <div class="rate" id="rate">${[1,2,3,4,5].map(i=>star(i)).join('')}</div>
+
+      <label class="fld">누구와 / 머문 기간</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="f_who" value="${esc(v.who||'')}" placeholder="혼자 / 친구 / 가족" />
+        <input type="text" id="f_days" value="${esc(v.days||'')}" placeholder="당일 / 1박 2일" />
+      </div>
+
+      <label class="fld">먹은 것 · 한 것</label>
+      <input type="text" id="f_food" value="${esc(v.food||'')}" placeholder="예) 바다라떼, 해변 산책" />
+
+      <label class="fld">한 줄 일기 <span style="font-weight:500">— 오늘 가장 좋았던 순간은?</span></label>
+      <textarea id="f_note" placeholder="그날의 기억을 적어보세요">${esc(v.note||'')}</textarea>
+    </div>
+
+    <button class="savebtn" onclick="savePin()">${editingId!=null?'수정 저장':'지도에 남기기'}</button>
+  `);
+  if(ex&&ex.type==='plan') pickType('plan');
+  pickWeather(formData.weather);
+  document.querySelectorAll('#rate .ic').forEach(s=>s.classList.toggle('on',+s.dataset.i<=formData.rating));
+  renderPhotoPreviews();
+  syncSeason();
+}
+const wopt=(v,ko)=>`<div class="opt ${v==='clear'?'on':''}" data-w="${v}" onclick="pickWeather('${v}')">${weatherIcon(v)}<span>${ko}</span></div>`;
+function weatherIcon(v){
+  const s='style="width:18px;height:18px"';
+  if(v==='clear')return`<svg class="ic" viewBox="0 0 24 24" ${s}><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`;
+  if(v==='cloudy')return`<svg class="ic" viewBox="0 0 24 24" ${s}><path d="M6 16a4 4 0 0 1 1-7.9A5 5 0 0 1 17 9a3.5 3.5 0 0 1 0 7H6z"/></svg>`;
+  if(v==='rain')return`<svg class="ic" viewBox="0 0 24 24" ${s}><path d="M6 14a4 4 0 0 1 1-7.9A5 5 0 0 1 17 7a3.5 3.5 0 0 1 0 7H6z"/><path d="M9 18l-1 2M13 18l-1 2"/></svg>`;
+  return`<svg class="ic" viewBox="0 0 24 24" ${s}><path d="M6 14a4 4 0 0 1 1-7.9A5 5 0 0 1 17 7a3.5 3.5 0 0 1 0 7H6z"/><circle cx="8" cy="19" r="1"/><circle cx="12" cy="20" r="1"/><circle cx="16" cy="19" r="1"/></svg>`;
+}
+const star=i=>`<svg class="ic" data-i="${i}" viewBox="0 0 24 24" onclick="pickRate(${i})"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/></svg>`;
+
+function pickType(t){formData.type=t;
+  document.querySelectorAll('#typeSeg .opt').forEach(o=>o.classList.toggle('on',o.dataset.t===t));
+  document.getElementById('recordFields').style.display=t==='plan'?'none':'block';
+}
+function pickWeather(v){formData.weather=v;
+  document.querySelectorAll('#wsel .opt').forEach(o=>o.classList.toggle('on',o.dataset.w===v));
+  setWeather(v==='cloudy'?'clear':v);
+}
+function pickRate(i){formData.rating=i;
+  document.querySelectorAll('#rate .ic').forEach(s=>s.classList.toggle('on',+s.dataset.i<=i));
+}
+function syncSeason(){
+  const d=document.getElementById('f_date'); if(!d)return;
+  const s=seasonOf(d.value);
+  const h=document.getElementById('seasonHint');
+  if(h)h.textContent='계절 자동 인식: '+SEASON_KO[s]+' · 핀 색이 이 계절 색으로 칠해져요';
+}
+
+/* ---- 위치 연관검색어(자동완성) ---- */
+function onLocInput(){
+  const q=document.getElementById('f_loc').value.trim();
+  clearTimeout(locTimer);
+  const box=document.getElementById('suggest');
+  if(q.length<2){box.innerHTML='';return;}
+  locTimer=setTimeout(()=>fetchSuggest(q),350);
+}
+async function fetchSuggest(q){
+  const box=document.getElementById('suggest'); if(!box)return;
+  box.innerHTML='<div class="sg-msg">검색 중…</div>';
+  const base='https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=ko&q=';
+  try{
+    let res=await fetch(base+encodeURIComponent(q)+'&countrycodes=kr'); let j=await res.json();
+    if(!j.length){ res=await fetch(base+encodeURIComponent(q)); j=await res.json(); }
+    suggestList=j.slice(0,3).map(r=>({lat:parseFloat(r.lat),lng:parseFloat(r.lon),short:(r.display_name||'').split(',').slice(0,3).join(', ')}));
+    if(!suggestList.length){ box.innerHTML='<div class="sg-msg">결과가 없어요. 지도를 직접 탭해도 돼요.</div>'; return; }
+    box.innerHTML=suggestList.map((r,i)=>
+      `<div class="sg-item" onclick="pickSuggest(${i})">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+        <span>${esc(r.short)}</span></div>`).join('');
+  }catch(e){ box.innerHTML='<div class="sg-msg">검색 실패 — 인터넷 연결을 확인하세요.</div>'; }
+}
+function pickSuggest(i){
+  const r=suggestList[i]; if(!r)return;
+  pendingLatLng={lat:r.lat,lng:r.lng};
+  const loc=document.getElementById('f_loc'); if(loc)loc.value=r.short;
+  document.getElementById('suggest').innerHTML='';
+  const note=document.getElementById('geoNote');
+  if(note){note.innerHTML='위치 선택됨 — <span style="color:var(--ink-soft)">'+esc(r.short)+'</span>'; note.style.color='var(--clay-deep)';}
+  map.flyTo([r.lat,r.lng],11);
+  if(formData.type==='record') autoWeather(false);
+}
+
+/* ---- 사진 ---- */
+function compressImage(file){
+  return new Promise((res,rej)=>{
+    const rd=new FileReader();
+    rd.onload=e=>{const img=new Image();
+      img.onload=()=>{const max=900;let w=img.width,h=img.height;
+        if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;}
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        res(c.toDataURL('image/jpeg',0.7));
+      };
+      img.onerror=rej; img.src=e.target.result;
+    };
+    rd.onerror=rej; rd.readAsDataURL(file);
+  });
+}
+async function handlePhotos(input){
+  const files=[...input.files];
+  for(const f of files){
+    if(formPhotos.length>=6){toast('사진은 6장까지 넣을 수 있어요');break;}
+    try{ formPhotos.push(await compressImage(f)); }catch(e){}
+  }
+  input.value=''; renderPhotoPreviews();
+}
+function removePhoto(i){formPhotos.splice(i,1);renderPhotoPreviews();}
+function renderPhotoPreviews(){
+  const row=document.getElementById('photoRow'); if(!row)return;
+  row.innerHTML=formPhotos.map((src,i)=>
+    `<div class="thumb"><img src="${src}">
+      <button type="button" class="rm" onclick="removePhoto(${i})">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>${i===0?'<span class="rep">대표</span>':''}</div>`).join('');
+}
+
+/* ---- 날씨 자동 조회 (Open-Meteo 과거 날씨) ---- */
+function wmoToWeather(c){
+  if((c>=71&&c<=77)||c===85||c===86) return 'snow';
+  if((c>=51&&c<=67)||(c>=80&&c<=82)||c>=95) return 'rain';
+  if(c===0||c===1) return 'clear';
+  return 'cloudy';
+}
+async function autoWeather(manual){
+  const d=document.getElementById('f_date'); const note=document.getElementById('wxNote');
+  if(!pendingLatLng){ if(manual&&note)note.textContent='먼저 위치를 골라주세요(검색 또는 지도 탭).'; return; }
+  if(!d||!d.value) return;
+  if(note)note.textContent='그날 날씨 불러오는 중…';
+  try{
+    const url=`https://archive-api.open-meteo.com/v1/archive?latitude=${pendingLatLng.lat}&longitude=${pendingLatLng.lng}&start_date=${d.value}&end_date=${d.value}&daily=weathercode&timezone=auto`;
+    const r=await fetch(url); const j=await r.json();
+    const code=j&&j.daily&&j.daily.weathercode?j.daily.weathercode[0]:null;
+    if(code==null){ if(note)note.textContent='그날 날씨를 못 찾았어요(최근 날짜는 데이터가 늦어요). 직접 골라주세요.'; return; }
+    const w=wmoToWeather(code); pickWeather(w);
+    if(note)note.textContent='자동 인식: '+WEATHER_KO[w]+' · 그날 그곳 날씨 기준';
+  }catch(e){ if(note)note.textContent='날씨 조회 실패 — 직접 골라주세요.'; }
+}
+
+/* ---- 저장 (추가/수정 공용, 무조건 닫힘) ---- */
+function savePin(){
+  if(!pendingLatLng){toast('위치를 먼저 골라주세요 — 검색 후보 선택 또는 지도 탭');return;}
+  try{
+    const name=document.getElementById('f_name').value.trim();
+    const locName=document.getElementById('f_loc').value.trim();
+    const isEdit=editingId!=null;
+    const p = isEdit ? state.pins.find(x=>x.id===editingId) : {id:Date.now()};
+    p.name = name || locName || '이름 없는 곳';
+    p.locName = locName;
+    p.lat=pendingLatLng.lat; p.lng=pendingLatLng.lng; p.type=formData.type;
+    if(formData.type==='record'){
+      p.date=document.getElementById('f_date').value;
+      p.weather=formData.weather;
+      p.rating=formData.rating;
+      p.who=document.getElementById('f_who').value.trim();
+      p.days=document.getElementById('f_days').value.trim();
+      p.food=document.getElementById('f_food').value.trim();
+      p.note=document.getElementById('f_note').value.trim();
+      p.photos=formPhotos.slice();
+    }else{ p.photos=[]; if(!p.note)p.note=''; }
+    if(!isEdit) state.pins.push(p);
+    save(); closeSheet(); renderPins();
+    map.flyTo([p.lat,p.lng], Math.max(map.getZoom(),9));
+    toast(isEdit?'기억을 수정했어요':(formData.type==='plan'?'계획 핀을 찍었어요':'기억을 지도에 남겼어요'));
+  }catch(err){ console.error(err); closeSheet(); toast('저장 중 문제가 있었어요 — 다시 시도해 주세요'); }
+}
+
+/* ---- 핀 상세 ---- */
+function openDetail(id){
+  const p=state.pins.find(x=>x.id===id); if(!p)return;
+  if(p.type==='plan'){
+    openSheet(`
+      <div class="chips"><span class="chip plan">계획 · 가고 싶은 곳</span></div>
+      <h3>${esc(p.name)}</h3>
+      <div class="sub">${esc(p.locName)||(p.lat.toFixed(3)+', '+p.lng.toFixed(3))}</div>
+      ${p.note?`<div class="note-box">${esc(p.note)}</div>`:''}
+      <button class="savebtn" onclick="convertToRecord(${p.id})">다녀왔어요 · 기록으로 전환</button>
+      <button class="ghostbtn" onclick="editPin(${p.id})">수정</button>
+      <button class="ghostbtn" onclick="delPin(${p.id})">삭제</button>
+    `);
+    return;
+  }
+  const s=seasonOf(p.date);
+  const photos=p.photos||[];
+  const photoBlock = photos.length
+    ? `<img class="det-photo-img" src="${photos[0]}">`+(photos.length>1?`<div class="det-thumbs">${photos.slice(1).map(src=>`<img src="${src}">`).join('')}</div>`:'')
+    : '';
+  openSheet(`
+    ${photoBlock}
+    <div class="chips">
+      <span class="chip weather">${weatherIcon(p.weather||'clear')} ${WEATHER_KO[p.weather]||'맑음'}</span>
+      <span class="chip season">${SEASON_KO[s]}</span>
+      ${p.mood?`<span class="chip">${esc(p.mood)}</span>`:''}
+    </div>
+    <h3>${esc(p.name)}</h3>
+    <div class="sub">${[esc(p.locName),p.date].filter(Boolean).join(' · ')}</div>
+    <div class="stars">${[1,2,3,4,5].map(i=>`<svg class="ic ${i<=(p.rating||0)?'fill':''}" viewBox="0 0 24 24"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/></svg>`).join('')}</div>
+    ${p.note?`<div class="note-box">${esc(p.note)}</div>`:''}
+    <div class="meta-grid">
+      <div class="meta"><div class="ml">위치</div><div class="mv">${esc(p.locName)||'-'}</div></div>
+      <div class="meta"><div class="ml">함께</div><div class="mv">${esc(p.who)||'-'}</div></div>
+      <div class="meta"><div class="ml">머문 기간</div><div class="mv">${esc(p.days)||'-'}</div></div>
+      <div class="meta"><div class="ml">먹은 것·한 것</div><div class="mv">${esc(p.food)||'-'}</div></div>
+    </div>
+    <button class="savebtn" onclick="editPin(${p.id})">수정하기</button>
+    <button class="ghostbtn" onclick="shareCard(${p.id})">이미지 카드로 공유</button>
+    <button class="ghostbtn" onclick="delPin(${p.id})">삭제</button>
+  `);
+  setWeather(p.weather==='cloudy'?'clear':(p.weather||'clear'),true);
+}
+function editPin(id){
+  const p=state.pins.find(x=>x.id===id); if(!p)return;
+  openAddForm({lat:p.lat,lng:p.lng}, id);
+}
+function convertToRecord(id){
+  const p=state.pins.find(x=>x.id===id); if(!p)return;
+  p.type='record'; p.date=new Date().toISOString().slice(0,10); p.weather=p.weather||'clear'; p.rating=p.rating||0;
+  save(); renderPins(); closeSheet(); toast('계획이 기록으로 — 색이 들어왔어요');
+  setTimeout(()=>openDetail(id),350);
+}
+function delPin(id){
+  state.pins=state.pins.filter(x=>x.id!==id); save(); renderPins(); closeSheet(); toast('삭제했어요');
+}
+
+/* ---- 이미지 카드 공유 ---- */
+function shareCard(id){
+  const p=state.pins.find(x=>x.id===id); if(!p)return;
+  const s=seasonOf(p.date);
+  const photo=(p.photos&&p.photos[0])||'';
+  document.getElementById('cardStage').innerHTML=`
+    <div class="share-card" id="theCard">
+      <div class="sc-photo" style="${photo?`background-image:url(${photo})`:'background:linear-gradient(160deg,#D8C2A6,#C9AE8A)'}"></div>
+      <div class="sc-body">
+        <div class="sc-chips"><span>${WEATHER_KO[p.weather]||'맑음'}</span><span>${SEASON_KO[s]}</span></div>
+        <div class="sc-title">${esc(p.name)}</div>
+        <div class="sc-date">${[esc(p.locName)||regionGuess(p),p.date].filter(Boolean).join(' · ')}</div>
+        ${p.note?`<div class="sc-note">${esc(p.note)}</div>`:''}
+        <div class="sc-brand"><span class="dot"></span> 내 여행 지도</div>
+      </div>
+    </div>`;
+  toast('카드 만드는 중…');
+  if(typeof html2canvas!=='function'){toast('카드 기능 로딩 실패 — 인터넷 확인');return;}
+  html2canvas(document.getElementById('theCard'),{scale:2,useCORS:true,backgroundColor:null}).then(canvas=>{
+    canvas.toBlob(async blob=>{
+      const file=new File([blob],(p.name||'card')+'.png',{type:'image/png'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file],title:p.name}); return; }catch(e){}
+      }
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(p.name||'card')+'.png'; a.click();
+      toast('이미지 카드를 저장했어요');
+    },'image/png');
+  }).catch(()=>toast('카드 생성 실패 — 다시 시도해 주세요'));
+}
+
+/* ---- 목록 / 배지 ---- */
+function showList(){
+  const recs=state.pins.filter(p=>p.type==='record').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  openSheet(`<h3>나의 기록</h3><div class="sub">${recs.length}곳의 기억</div>`+
+    (recs.length?recs.map(p=>`
+      <div class="goal" onclick="closeSheet();setTimeout(()=>{map.flyTo([${p.lat},${p.lng}],10);openDetail(${p.id})},320)">
+        <div class="gi" style="background:${SEASON_COLOR[seasonOf(p.date)]};color:#fff">
+          <svg class="ic" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg></div>
+        <div><div class="gt">${esc(p.name)}</div><div class="gd">${[esc(p.locName),p.date,SEASON_KO[seasonOf(p.date)],WEATHER_KO[p.weather]||'맑음'].filter(Boolean).join(' · ')}</div></div>
+      </div>`).join(''):'<div class="note-box">아직 기록이 없어요. 지도를 탭해 첫 핀을 찍어보세요.</div>'));
+}
+function showBadges(){
+  const bs=computeBadges();
+  openSheet(`<h3>성취</h3><div class="sub">${bs.filter(b=>b.got).length} / ${bs.length} 모음</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:8px">
+    ${bs.map(b=>`
+      <div class="meta" style="text-align:center;opacity:${b.got?1:.5}">
+        <div style="width:42px;height:42px;border-radius:50%;margin:2px auto 8px;display:grid;place-items:center;
+          background:${b.got?'var(--clay)':'var(--surface)'};border:1px solid var(--line)">
+          <svg class="ic" viewBox="0 0 24 24" style="stroke:${b.got?'#fff':'var(--clay)'}">${b.ic}</svg></div>
+        <div style="font-size:12.5px;font-weight:700">${b.name}</div>
+        <div style="font-size:10.5px;color:var(--ink-soft);margin-top:2px">${b.got?'달성':b.desc}</div>
+      </div>`).join('')}</div>`);
+}
+
+/* ---- 날씨 이펙트 ---- */
+function setWeather(w, silent){
+  currentWeather=w;
+  document.querySelectorAll('.wbtn').forEach(b=>b.classList.toggle('on',b.dataset.w===w));
+  const fx=document.getElementById('fx'); fx.className='weather-fx'; fx.innerHTML='';
+  if(w==='rain'||w==='snow'){
+    fx.classList.add(w);
+    const n=w==='rain'?42:34; let html='';
+    for(let i=0;i<n;i++){
+      const left=Math.random()*100,
+        dur=(w==='rain'?(0.5+Math.random()*0.6):(4+Math.random()*4)).toFixed(2),
+        delay=(Math.random()*3).toFixed(2),
+        drift=w==='snow'?`;margin-left:${(Math.random()*20-10).toFixed(0)}px`:'';
+      html+=`<i style="left:${left}%;animation-duration:${dur}s;animation-delay:${delay}s${drift}"></i>`;
+    }
+    fx.innerHTML=html;
+  }
+}
+
+/* ---- 온보딩 ---- */
+let goalPick='near';
+function showOnboarding(){
+  openSheet(`
+    <div class="ob-ring"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/></svg></div>
+    <h3>이번 달, 작은 목표 하나만 정해볼까요?</h3>
+    <div class="sub">거창하지 않아도 좋아요. 근교 나들이도 당신의 여행이니까요.</div>
+    ${goalOpt('near','이번 달, 근교 한 곳 다녀오기','집에서 1시간 거리 안')}
+    ${goalOpt('new3','이번 분기, 새 지역 3곳','안 가본 시·군')}
+    ${goalOpt('free','천천히, 마음 가는 대로','목표 없이 시작')}
+    <button class="savebtn" onclick="finishOnboarding()">내 지도 시작하기</button>`);
+}
+const goalOpt=(v,t,d)=>`<div class="goal ${v==='near'?'sel':''}" data-g="${v}" onclick="pickGoal('${v}')">
+  <div class="gi"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg></div>
+  <div><div class="gt">${t}</div><div class="gd">${d}</div></div></div>`;
+function pickGoal(v){goalPick=v;document.querySelectorAll('.goal[data-g]').forEach(o=>o.classList.toggle('sel',o.dataset.g===v));}
+function finishOnboarding(){state.goal=goalPick||'near';state.onboarded=true;save();closeSheet();toast('좋아요. 첫 핀을 찍어볼까요?');}
+
+/* ---- 유틸 ---- */
+function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+let toastT;
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200);}
+function hideHintIfAny(){const h=document.getElementById('hint');
+  if(h&&state.pins.length>0){h.style.opacity='0';setTimeout(()=>h.remove(),500);}}
+
+/* ---- 시작 ---- */
+initMap();
+if(!state.onboarded) setTimeout(showOnboarding,500);
+let qi=0;
+const qEl=document.getElementById('quoteText'); qEl.style.transition='opacity .3s';
+setInterval(()=>{qi=(qi+1)%QUOTES.length; qEl.style.opacity=0;
+  setTimeout(()=>{qEl.textContent=QUOTES[qi];qEl.style.opacity=1;},300);},5000);
+</script>
+</body>
+</html>
