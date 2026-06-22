@@ -34,10 +34,11 @@
   .app-name{font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
   .app-name .dot{width:9px;height:9px;border-radius:50%;background:var(--clay)}
   .app-name small{font-size:11px;font-weight:600;color:var(--ink-soft)}
-  .wbtns{display:flex;gap:6px}
+  .wbtns{display:flex;gap:6px;align-items:center}
   .wbtn{border:1px solid var(--line);background:var(--surface-2);color:var(--ink-soft);
-    border-radius:9px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+    border-radius:9px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:grid;place-items:center}
   .wbtn.on{background:var(--clay);color:#fff;border-color:var(--clay)}
+  .wsep{width:1px;height:18px;background:var(--line);margin:0 2px}
   .quote{margin-top:10px;background:linear-gradient(90deg,#FBF1E8,#F6EEE0);
     border:1px solid var(--line);border-radius:13px;padding:9px 12px;
     font-size:12.5px;color:var(--clay-deep);font-weight:600;display:flex;align-items:center;gap:8px}
@@ -92,7 +93,7 @@
   .sheet .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px}
 
   label.fld{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin:14px 0 6px}
-  input[type=text],input[type=date],textarea,select{
+  input[type=text],input[type=date],input[type=email],input[type=password],textarea,select{
     width:100%;font-family:inherit;font-size:14px;color:var(--ink);
     background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 13px;outline:none}
   textarea{resize:none;height:84px;line-height:1.6}
@@ -104,7 +105,6 @@
   .mini-link{background:none;border:none;color:var(--clay-deep);font-size:12px;font-weight:700;
     cursor:pointer;font-family:inherit;text-decoration:underline}
 
-  /* 위치 연관검색어 */
   .suggest{margin-top:6px}
   .suggest:empty{display:none}
   .sg-item{display:flex;align-items:center;gap:9px;padding:11px 13px;background:var(--surface-2);
@@ -175,7 +175,7 @@
 
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
     background:var(--ink);color:#fff;font-size:13px;font-weight:600;padding:11px 18px;border-radius:999px;
-    z-index:1000;opacity:0;transition:all .3s;pointer-events:none;max-width:86%;text-align:center}
+    z-index:3000;opacity:0;transition:all .3s;pointer-events:none;max-width:86%;text-align:center}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   #cardStage{position:fixed;left:-99999px;top:0}
@@ -190,9 +190,39 @@
   .sc-note{font-size:15px;color:#5b5043;line-height:1.7;margin-top:16px}
   .sc-brand{display:flex;align-items:center;gap:8px;margin-top:22px;font-size:13px;font-weight:700;color:var(--clay-deep)}
   .sc-brand .dot{width:9px;height:9px;border-radius:50%;background:var(--clay)}
+
+  /* 로그인 화면 */
+  .auth{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(900px 500px at 80% -10%,#F6EFE3,transparent),radial-gradient(700px 420px at 0% 110%,#EBE0CF,transparent),var(--bg)}
+  .auth.show{display:flex}
+  .auth-card{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--line);
+    border-radius:22px;padding:30px 26px;box-shadow:var(--shadow);text-align:center}
+  .auth-logo{width:56px;height:56px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;
+    background:var(--surface-2);border:1px solid var(--line);color:var(--clay)}
+  .auth-card h2{font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .auth-card .desc{font-size:13px;color:var(--ink-soft);margin:6px 0 22px}
+  .auth-card input{margin-bottom:10px;text-align:left}
+  .auth-msg{font-size:12px;min-height:16px;margin:2px 0 8px;text-align:left;color:var(--ink-soft)}
+  .auth-toggle{font-size:13px;color:var(--ink-soft);margin-top:14px}
+  .auth-toggle a{color:var(--clay-deep);font-weight:700;cursor:pointer;text-decoration:underline}
 </style>
 </head>
 <body>
+
+<!-- 로그인/회원가입 -->
+<div class="auth" id="auth">
+  <div class="auth-card">
+    <div class="auth-logo"><svg class="ic" viewBox="0 0 24 24" style="width:26px;height:26px"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.4"/></svg></div>
+    <h2>내 여행 지도</h2>
+    <div class="desc">가본 곳에 색이 물드는 나만의 지도</div>
+    <input type="email" id="au_email" placeholder="이메일" autocomplete="email" />
+    <input type="password" id="au_pw" placeholder="비밀번호 (6자 이상)" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()" />
+    <div class="auth-msg" id="au_msg"></div>
+    <button class="savebtn" id="au_submit" style="margin-top:6px" onclick="doAuth()">로그인</button>
+    <div class="auth-toggle" id="au_switch">계정이 없으신가요? <a onclick="toggleAuthMode()">회원가입</a></div>
+  </div>
+</div>
+
 <div class="app">
   <header>
     <div class="app-row">
@@ -201,6 +231,10 @@
         <button class="wbtn on" data-w="clear" onclick="setWeather('clear')">맑음</button>
         <button class="wbtn" data-w="rain" onclick="setWeather('rain')">비</button>
         <button class="wbtn" data-w="snow" onclick="setWeather('snow')">눈</button>
+        <span class="wsep"></span>
+        <button class="wbtn" onclick="logout()" title="로그아웃">
+          <svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 8l-4 4 4 4M6 12h10"/></svg>
+        </button>
       </div>
     </div>
     <div class="quote" id="quote">
@@ -239,9 +273,15 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-/* ---------------- 상태 ---------------- */
-const KEY='tmap_state_v1';
+/* ---------------- Supabase 연결 ---------------- */
+const SB_URL='https://qhjonwpxupctrydhvasv.supabase.co';
+const SB_KEY='sb_publishable_x_W61kHh9esVnq4KW7JUew_Dl1l2RER';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const ONBOARD_KEY='tmap_onboarded';
+
+/* ---------------- 상수 ---------------- */
 const QUOTES=[
   '근교도, 당신의 여행입니다.',
   '거창하지 않아도 좋아요. 오늘의 발걸음을 남겨요.',
@@ -254,38 +294,86 @@ const SEASON_COLOR={spring:'#E2A9B6',summer:'#86B392',autumn:'#D69A57',winter:'#
 const SEASON_KO={spring:'봄',summer:'여름',autumn:'가을',winter:'겨울'};
 const WEATHER_KO={clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'};
 
-let state=load();
+let state={pins:[]};
 let map, markers={}, pendingLatLng=null, currentWeather='clear';
 let editingId=null, formPhotos=[], formData={type:'record',weather:'clear',rating:0};
-let suggestList=[], locTimer=null;
+let suggestList=[], locTimer=null, currentUser=null;
 
-function load(){
-  try{const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.pins) return s;}catch(e){}
-  return {goal:null, onboarded:false, pins:seed()};
-}
-function save(){
-  try{ localStorage.setItem(KEY,JSON.stringify(state)); }
-  catch(e){ toast('저장 공간이 부족해요 — 사진 수를 줄여보세요'); }
-}
-function seed(){
-  return [
-    {id:1,name:'강릉 바다 나들이',locName:'강릉 안목해변',lat:37.7726,lng:128.9470,type:'record',date:'2024-11-18',weather:'rain',mood:'차분했던',rating:4,who:'혼자',days:'1박 2일',food:'바다라떼·물회',note:'비가 와서 카페에 오래 앉아 있었다. 파도 소리랑 빗소리가 섞이는 게 좋았다.',photos:[]},
-    {id:2,name:'전주 골목 산책',locName:'전주 한옥마을',lat:35.8150,lng:127.1530,type:'record',date:'2024-06-07',weather:'clear',mood:'좋았던',rating:5,who:'친구',days:'당일',food:'비빔밥·콩나물국밥',note:'골목골목 걷는 게 좋았다.',photos:[]},
-    {id:3,name:'가을 북촌 걷기',locName:'북촌 한옥길',lat:37.5826,lng:126.9850,type:'record',date:'2024-10-03',weather:'clear',mood:'평화로운',rating:4,who:'가족',days:'당일',food:'전통차',note:'',photos:[]},
-    {id:4,name:'제주 겨울바다',locName:'제주',lat:33.3617,lng:126.5292,type:'plan',note:'겨울 바다 보러',photos:[]},
-  ];
-}
 function seasonOf(dateStr){
   const m=dateStr?(new Date(dateStr).getMonth()+1):(new Date().getMonth()+1);
   if(m>=3&&m<=5)return'spring'; if(m>=6&&m<=8)return'summer';
   if(m>=9&&m<=11)return'autumn'; return'winter';
+}
+function pinPayload(p){ const o=Object.assign({},p); delete o.id; return o; }
+
+/* ---------------- 인증 ---------------- */
+let authMode='login';
+function toggleAuthMode(){
+  authMode = authMode==='login'?'signup':'login';
+  document.getElementById('au_submit').textContent = authMode==='login'?'로그인':'회원가입';
+  document.getElementById('au_switch').innerHTML = authMode==='login'
+    ? '계정이 없으신가요? <a onclick="toggleAuthMode()">회원가입</a>'
+    : '이미 계정이 있으신가요? <a onclick="toggleAuthMode()">로그인</a>';
+  document.getElementById('au_msg').textContent='';
+}
+function authErr(m){
+  if(/invalid login credentials/i.test(m)) return '이메일 또는 비밀번호가 올바르지 않아요.';
+  if(/already registered|already exists/i.test(m)) return '이미 가입된 이메일이에요. 로그인해 주세요.';
+  if(/at least 6/i.test(m)) return '비밀번호는 6자 이상이어야 해요.';
+  if(/invalid email/i.test(m)) return '이메일 형식을 확인해 주세요.';
+  return m;
+}
+async function doAuth(){
+  const email=document.getElementById('au_email').value.trim();
+  const pw=document.getElementById('au_pw').value;
+  const msg=document.getElementById('au_msg');
+  if(!email||!pw){msg.style.color='#c2542f';msg.textContent='이메일과 비밀번호를 입력해 주세요.';return;}
+  msg.style.color='var(--ink-soft)'; msg.textContent='처리 중…';
+  try{
+    let res = authMode==='signup'
+      ? await sb.auth.signUp({email,password:pw})
+      : await sb.auth.signInWithPassword({email,password:pw});
+    if(res.error){ msg.style.color='#c2542f'; msg.textContent=authErr(res.error.message); return; }
+    if(authMode==='signup' && !res.data.session){
+      msg.style.color='var(--clay-deep)';
+      msg.textContent='가입 완료! 이메일 인증 메일을 확인한 뒤 로그인해 주세요.';
+      return;
+    }
+    /* 세션 생기면 onAuthStateChange가 앱으로 진입시킴 */
+  }catch(e){ msg.style.color='#c2542f'; msg.textContent='오류가 발생했어요. 다시 시도해 주세요.'; }
+}
+async function logout(){
+  await sb.auth.signOut();
+  currentUser=null; state.pins=[]; if(map) renderPins();
+  toast('로그아웃했어요');
+}
+function showAuth(){ currentUser=null; document.getElementById('auth').classList.add('show'); }
+async function applySession(session){
+  if(session && session.user){
+    if(currentUser===session.user.id) return;
+    currentUser=session.user.id;
+    document.getElementById('auth').classList.remove('show');
+    await loadPins();
+    renderPins();
+    if(map) map.invalidateSize();
+    if(!localStorage.getItem(ONBOARD_KEY)) setTimeout(showOnboarding,400);
+  }else{
+    showAuth();
+  }
+}
+
+/* ---------------- 데이터(클라우드) ---------------- */
+async function loadPins(){
+  const {data,error}=await sb.from('travel_pins').select('id,data,created_at').order('created_at',{ascending:true});
+  if(error){ console.error(error); toast('불러오기 실패: '+error.message); state.pins=[]; return; }
+  state.pins=(data||[]).map(r=>Object.assign({id:r.id}, r.data||{}));
 }
 
 /* ---------------- 지도 ---------------- */
 function initMap(){
   map=L.map('map',{zoomControl:true,attributionControl:false}).setView([36.3,127.8],7);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd'}).addTo(map);
-  map.on('click',e=>openAddForm(e.latlng));
+  map.on('click',e=>{ if(currentUser) openAddForm(e.latlng); });
   renderPins();
 }
 function renderPins(){
@@ -351,7 +439,7 @@ function closeSheet(){
 }
 
 /* ---- 핀 추가/수정 폼 ---- */
-function quickAdd(){ openAddForm(map.getCenter()); }
+function quickAdd(){ if(currentUser) openAddForm(map.getCenter()); }
 function openAddForm(latlng, editId){
   pendingLatLng=latlng;
   editingId = (editId!=null)?editId:null;
@@ -453,7 +541,7 @@ function syncSeason(){
   if(h)h.textContent='계절 자동 인식: '+SEASON_KO[s]+' · 핀 색이 이 계절 색으로 칠해져요';
 }
 
-/* ---- 위치 연관검색어(자동완성) ---- */
+/* ---- 위치 연관검색어 ---- */
 function onLocInput(){
   const q=document.getElementById('f_loc').value.trim();
   clearTimeout(locTimer);
@@ -521,7 +609,7 @@ function renderPhotoPreviews(){
       </button>${i===0?'<span class="rep">대표</span>':''}</div>`).join('');
 }
 
-/* ---- 날씨 자동 조회 (Open-Meteo 과거 날씨) ---- */
+/* ---- 날씨 자동 조회 ---- */
 function wmoToWeather(c){
   if((c>=71&&c<=77)||c===85||c===86) return 'snow';
   if((c>=51&&c<=67)||(c>=80&&c<=82)||c>=95) return 'rain';
@@ -543,14 +631,15 @@ async function autoWeather(manual){
   }catch(e){ if(note)note.textContent='날씨 조회 실패 — 직접 골라주세요.'; }
 }
 
-/* ---- 저장 (추가/수정 공용, 무조건 닫힘) ---- */
-function savePin(){
+/* ---- 저장 (클라우드, 추가/수정 공용) ---- */
+async function savePin(){
+  if(!currentUser){toast('로그인이 필요해요');return;}
   if(!pendingLatLng){toast('위치를 먼저 골라주세요 — 검색 후보 선택 또는 지도 탭');return;}
   try{
     const name=document.getElementById('f_name').value.trim();
     const locName=document.getElementById('f_loc').value.trim();
     const isEdit=editingId!=null;
-    const p = isEdit ? state.pins.find(x=>x.id===editingId) : {id:Date.now()};
+    let p = isEdit ? state.pins.find(x=>x.id===editingId) : {};
     p.name = name || locName || '이름 없는 곳';
     p.locName = locName;
     p.lat=pendingLatLng.lat; p.lng=pendingLatLng.lng; p.type=formData.type;
@@ -564,11 +653,19 @@ function savePin(){
       p.note=document.getElementById('f_note').value.trim();
       p.photos=formPhotos.slice();
     }else{ p.photos=[]; if(!p.note)p.note=''; }
-    if(!isEdit) state.pins.push(p);
-    save(); closeSheet(); renderPins();
+
+    if(isEdit){
+      const {error}=await sb.from('travel_pins').update({data:pinPayload(p)}).eq('id',editingId);
+      if(error)throw error;
+    }else{
+      const {data,error}=await sb.from('travel_pins').insert({user_id:currentUser,data:pinPayload(p)}).select('id').single();
+      if(error)throw error;
+      p.id=data.id; state.pins.push(p);
+    }
+    closeSheet(); renderPins();
     map.flyTo([p.lat,p.lng], Math.max(map.getZoom(),9));
     toast(isEdit?'기억을 수정했어요':(formData.type==='plan'?'계획 핀을 찍었어요':'기억을 지도에 남겼어요'));
-  }catch(err){ console.error(err); closeSheet(); toast('저장 중 문제가 있었어요 — 다시 시도해 주세요'); }
+  }catch(err){ console.error(err); toast('저장 실패 — '+(err.message||'다시 시도해 주세요')); }
 }
 
 /* ---- 핀 상세 ---- */
@@ -580,9 +677,9 @@ function openDetail(id){
       <h3>${esc(p.name)}</h3>
       <div class="sub">${esc(p.locName)||(p.lat.toFixed(3)+', '+p.lng.toFixed(3))}</div>
       ${p.note?`<div class="note-box">${esc(p.note)}</div>`:''}
-      <button class="savebtn" onclick="convertToRecord(${p.id})">다녀왔어요 · 기록으로 전환</button>
-      <button class="ghostbtn" onclick="editPin(${p.id})">수정</button>
-      <button class="ghostbtn" onclick="delPin(${p.id})">삭제</button>
+      <button class="savebtn" onclick="convertToRecord('${p.id}')">다녀왔어요 · 기록으로 전환</button>
+      <button class="ghostbtn" onclick="editPin('${p.id}')">수정</button>
+      <button class="ghostbtn" onclick="delPin('${p.id}')">삭제</button>
     `);
     return;
   }
@@ -608,9 +705,9 @@ function openDetail(id){
       <div class="meta"><div class="ml">머문 기간</div><div class="mv">${esc(p.days)||'-'}</div></div>
       <div class="meta"><div class="ml">먹은 것·한 것</div><div class="mv">${esc(p.food)||'-'}</div></div>
     </div>
-    <button class="savebtn" onclick="editPin(${p.id})">수정하기</button>
-    <button class="ghostbtn" onclick="shareCard(${p.id})">이미지 카드로 공유</button>
-    <button class="ghostbtn" onclick="delPin(${p.id})">삭제</button>
+    <button class="savebtn" onclick="editPin('${p.id}')">수정하기</button>
+    <button class="ghostbtn" onclick="shareCard('${p.id}')">이미지 카드로 공유</button>
+    <button class="ghostbtn" onclick="delPin('${p.id}')">삭제</button>
   `);
   setWeather(p.weather==='cloudy'?'clear':(p.weather||'clear'),true);
 }
@@ -618,14 +715,18 @@ function editPin(id){
   const p=state.pins.find(x=>x.id===id); if(!p)return;
   openAddForm({lat:p.lat,lng:p.lng}, id);
 }
-function convertToRecord(id){
+async function convertToRecord(id){
   const p=state.pins.find(x=>x.id===id); if(!p)return;
   p.type='record'; p.date=new Date().toISOString().slice(0,10); p.weather=p.weather||'clear'; p.rating=p.rating||0;
-  save(); renderPins(); closeSheet(); toast('계획이 기록으로 — 색이 들어왔어요');
+  try{ const {error}=await sb.from('travel_pins').update({data:pinPayload(p)}).eq('id',id); if(error)throw error; }
+  catch(e){ toast('전환 실패 — 다시 시도해 주세요'); return; }
+  renderPins(); closeSheet(); toast('계획이 기록으로 — 색이 들어왔어요');
   setTimeout(()=>openDetail(id),350);
 }
-function delPin(id){
-  state.pins=state.pins.filter(x=>x.id!==id); save(); renderPins(); closeSheet(); toast('삭제했어요');
+async function delPin(id){
+  try{ const {error}=await sb.from('travel_pins').delete().eq('id',id); if(error)throw error; }
+  catch(e){ toast('삭제 실패 — 다시 시도해 주세요'); return; }
+  state.pins=state.pins.filter(x=>x.id!==id); renderPins(); closeSheet(); toast('삭제했어요');
 }
 
 /* ---- 이미지 카드 공유 ---- */
@@ -660,16 +761,18 @@ function shareCard(id){
 
 /* ---- 목록 / 배지 ---- */
 function showList(){
+  if(!currentUser)return;
   const recs=state.pins.filter(p=>p.type==='record').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   openSheet(`<h3>나의 기록</h3><div class="sub">${recs.length}곳의 기억</div>`+
     (recs.length?recs.map(p=>`
-      <div class="goal" onclick="closeSheet();setTimeout(()=>{map.flyTo([${p.lat},${p.lng}],10);openDetail(${p.id})},320)">
+      <div class="goal" onclick="closeSheet();setTimeout(()=>{map.flyTo([${p.lat},${p.lng}],10);openDetail('${p.id}')},320)">
         <div class="gi" style="background:${SEASON_COLOR[seasonOf(p.date)]};color:#fff">
           <svg class="ic" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg></div>
         <div><div class="gt">${esc(p.name)}</div><div class="gd">${[esc(p.locName),p.date,SEASON_KO[seasonOf(p.date)],WEATHER_KO[p.weather]||'맑음'].filter(Boolean).join(' · ')}</div></div>
       </div>`).join(''):'<div class="note-box">아직 기록이 없어요. 지도를 탭해 첫 핀을 찍어보세요.</div>'));
 }
 function showBadges(){
+  if(!currentUser)return;
   const bs=computeBadges();
   openSheet(`<h3>성취</h3><div class="sub">${bs.filter(b=>b.got).length} / ${bs.length} 모음</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:8px">
@@ -680,13 +783,14 @@ function showBadges(){
           <svg class="ic" viewBox="0 0 24 24" style="stroke:${b.got?'#fff':'var(--clay)'}">${b.ic}</svg></div>
         <div style="font-size:12.5px;font-weight:700">${b.name}</div>
         <div style="font-size:10.5px;color:var(--ink-soft);margin-top:2px">${b.got?'달성':b.desc}</div>
-      </div>`).join('')}</div>`);
+      </div>`).join('')}</div>
+    <button class="ghostbtn" onclick="logout()">로그아웃</button>`);
 }
 
 /* ---- 날씨 이펙트 ---- */
 function setWeather(w, silent){
   currentWeather=w;
-  document.querySelectorAll('.wbtn').forEach(b=>b.classList.toggle('on',b.dataset.w===w));
+  document.querySelectorAll('.wbtn[data-w]').forEach(b=>b.classList.toggle('on',b.dataset.w===w));
   const fx=document.getElementById('fx'); fx.className='weather-fx'; fx.innerHTML='';
   if(w==='rain'||w==='snow'){
     fx.classList.add(w);
@@ -718,19 +822,20 @@ const goalOpt=(v,t,d)=>`<div class="goal ${v==='near'?'sel':''}" data-g="${v}" o
   <div class="gi"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg></div>
   <div><div class="gt">${t}</div><div class="gd">${d}</div></div></div>`;
 function pickGoal(v){goalPick=v;document.querySelectorAll('.goal[data-g]').forEach(o=>o.classList.toggle('sel',o.dataset.g===v));}
-function finishOnboarding(){state.goal=goalPick||'near';state.onboarded=true;save();closeSheet();toast('좋아요. 첫 핀을 찍어볼까요?');}
+function finishOnboarding(){localStorage.setItem(ONBOARD_KEY,'1');closeSheet();toast('좋아요. 첫 핀을 찍어볼까요?');}
 
 /* ---- 유틸 ---- */
 function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 let toastT;
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
-  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200);}
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2400);}
 function hideHintIfAny(){const h=document.getElementById('hint');
-  if(h&&state.pins.length>0){h.style.opacity='0';setTimeout(()=>h.remove(),500);}}
+  if(h&&state.pins.length>0){h.style.opacity='0';setTimeout(()=>{if(h.parentNode)h.remove();},500);}}
 
 /* ---- 시작 ---- */
 initMap();
-if(!state.onboarded) setTimeout(showOnboarding,500);
+sb.auth.onAuthStateChange((_e,session)=>applySession(session));
+sb.auth.getSession().then(({data})=>applySession(data.session));
 let qi=0;
 const qEl=document.getElementById('quoteText'); qEl.style.transition='opacity .3s';
 setInterval(()=>{qi=(qi+1)%QUOTES.length; qEl.style.opacity=0;
