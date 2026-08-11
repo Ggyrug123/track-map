@@ -190,6 +190,24 @@
   .badge-pop .bp-t{font-size:11px;font-weight:700;opacity:.85}
   .badge-pop .bp-n{font-size:15px;font-weight:800;margin-top:1px}
 
+  /* 목표 진행률 */
+  .goal-bar{margin-top:9px;display:flex;flex-direction:column;gap:6px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+  .gb-txt{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .gb-title{font-size:11.5px;font-weight:700;color:var(--ink)}
+  .gb-num{font-size:11px;font-weight:800;color:var(--clay-deep);flex:none}
+  .gb-track{height:7px;border-radius:4px;background:#EAE1D2;overflow:hidden}
+  .gb-fill{height:100%;background:var(--clay);border-radius:4px;transition:width .45s}
+  .goal-card{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
+  .gc-label{font-size:10.5px;font-weight:700;color:var(--ink-soft)}
+  .gc-title{font-size:15px;font-weight:800;margin-top:4px}
+  .gc-sub{font-size:12px;color:var(--ink-soft);margin-top:3px}
+  .gc-num{font-size:11px;font-weight:800;color:var(--clay-deep);margin-top:6px;text-align:right}
+  .gc-change{margin-top:12px;font-size:11px;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .gchip{font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;padding:5px 10px;border-radius:999px;
+    border:1px solid var(--line);background:var(--surface);color:var(--ink-soft)}
+  .gchip.on{background:var(--clay);color:#fff;border-color:var(--clay)}
+
   #cardStage{position:fixed;left:-99999px;top:0}
   .share-card{width:480px;background:var(--surface);border:1px solid var(--line);border-radius:24px;overflow:hidden;font-family:inherit}
   .sc-photo{height:300px;background-size:cover;background-position:center}
@@ -260,6 +278,7 @@
       <svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
       <span id="quoteText">근교도, 당신의 여행입니다.</span>
     </div>
+    <div class="goal-bar" id="goalBar" style="display:none"></div>
   </header>
 
   <div class="map-wrap">
@@ -317,7 +336,12 @@ const WEATHER_KO={clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'};
 let state={pins:[]};
 let map, markers={}, pendingLatLng=null, currentWeather='clear';
 let editingId=null, formPhotos=[], formData={type:'record',weather:'clear',rating:0};
-let suggestList=[], locTimer=null, currentUser=null;
+let suggestList=[], locTimer=null, currentUser=null, currentGoal=null;
+const GOALS={
+  near:{title:'이번 달, 근교 한 곳 다녀오기'},
+  new3:{title:'이번 분기, 새 지역 3곳'},
+  free:{title:'천천히, 마음 가는 대로'}
+};
 
 function seasonOf(dateStr){
   const m=dateStr?(new Date(dateStr).getMonth()+1):(new Date().getMonth()+1);
@@ -385,11 +409,13 @@ async function applySession(session){
     currentUser=session.user.id;
     document.getElementById('auth').classList.remove('show');
     document.querySelector('.app').classList.add('ready');
+    const meta=session.user.user_metadata||{};
+    currentGoal=meta.goal||null;
     await loadPins();
     renderPins();
     if(map) map.invalidateSize();
     initAmbientWeather();
-    if(!localStorage.getItem(ONBOARD_KEY)) setTimeout(showOnboarding,400);
+    if(!meta.onboarded) setTimeout(showOnboarding,400);
   }else{
     showAuth();
   }
@@ -422,7 +448,7 @@ function renderPins(){
     mk.on('click',ev=>{L.DomEvent.stopPropagation(ev); openDetail(p.id);});
     markers[p.id]=mk;
   });
-  renderStats(); hideHintIfAny();
+  renderStats(); renderGoal(); hideHintIfAny();
 }
 
 /* ---------------- 통계 / 배지 ---------------- */
@@ -845,8 +871,10 @@ function showList(){
 }
 function showBadges(){
   if(!currentUser)return;
+  const g=goalProgress();
+  const goalSec=`<div class="goal-card"><div class="gc-label">이번 목표</div>${g?`<div class="gc-title">${g.current>=g.target?'달성! ':''}${esc(g.title)}</div><div class="gb-track" style="margin-top:9px"><div class="gb-fill" style="width:${Math.min(100,Math.round(g.current/g.target*100))}%"></div></div><div class="gc-num">${g.current} / ${g.target}</div>`:`<div class="gc-title">천천히, 마음 가는 대로</div><div class="gc-sub">목표 없이 자유롭게 기록 중</div>`}<div class="gc-change">목표 바꾸기 ${goalChip('near','근교 1곳')}${goalChip('new3','새 지역 3곳')}${goalChip('free','자유')}</div></div>`;
   const bs=computeBadges();
-  openSheet(`<h3>성취</h3><div class="sub">${bs.filter(b=>b.got).length} / ${bs.length} 모음</div>
+  openSheet(`<h3>성취</h3>${goalSec}<div class="sub" style="margin-top:14px">배지 ${bs.filter(b=>b.got).length} / ${bs.length}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:8px">
     ${bs.map(b=>`
       <div class="meta" style="text-align:center;opacity:${b.got?1:.5}">
@@ -912,7 +940,44 @@ const goalOpt=(v,t,d)=>`<div class="goal ${v==='near'?'sel':''}" data-g="${v}" o
   <div class="gi"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg></div>
   <div><div class="gt">${t}</div><div class="gd">${d}</div></div></div>`;
 function pickGoal(v){goalPick=v;document.querySelectorAll('.goal[data-g]').forEach(o=>o.classList.toggle('sel',o.dataset.g===v));}
-function finishOnboarding(){localStorage.setItem(ONBOARD_KEY,'1');closeSheet();toast('좋아요. 첫 핀을 찍어볼까요?');}
+async function finishOnboarding(){
+  currentGoal=goalPick||'near';
+  closeSheet(); renderGoal(); toast('좋아요. 첫 핀을 찍어볼까요?');
+  try{ await sb.auth.updateUser({data:{onboarded:true, goal:currentGoal}}); }catch(e){}
+}
+/* ---- 오늘의 목표 진행률 ---- */
+function goalProgress(){
+  if(!currentGoal||currentGoal==='free') return null;
+  const recs=state.pins.filter(p=>p.type==='record'&&p.date);
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  if(currentGoal==='near'){
+    const cur=recs.filter(p=>{const d=new Date(p.date);return d.getFullYear()===y&&d.getMonth()===m;}).length;
+    return {title:GOALS.near.title, current:Math.min(cur,1), target:1};
+  }
+  if(currentGoal==='new3'){
+    const q=Math.floor(m/3);
+    const inQ=recs.filter(p=>{const d=new Date(p.date);return d.getFullYear()===y&&Math.floor(d.getMonth()/3)===q;});
+    const regions=new Set(inQ.map(regionGuess));
+    return {title:GOALS.new3.title, current:Math.min(regions.size,3), target:3};
+  }
+  return null;
+}
+function renderGoal(){
+  const el=document.getElementById('goalBar'); if(!el)return;
+  const g=goalProgress();
+  if(!g){ el.style.display='none'; return; }
+  el.style.display='flex';
+  const pct=Math.min(100,Math.round(g.current/g.target*100));
+  const done=g.current>=g.target;
+  el.innerHTML=`<div class="gb-txt"><span class="gb-title">${done?'목표 달성 — ':''}${esc(g.title)}</span><span class="gb-num">${g.current}/${g.target}</span></div>
+    <div class="gb-track"><div class="gb-fill" style="width:${pct}%"></div></div>`;
+}
+const goalChip=(v,l)=>`<button class="gchip ${currentGoal===v?'on':''}" onclick="setGoal('${v}')">${l}</button>`;
+async function setGoal(g){
+  currentGoal=g; renderGoal(); showBadges();
+  try{ await sb.auth.updateUser({data:{onboarded:true, goal:g}}); }catch(e){}
+  toast('목표를 바꿨어요');
+}
 
 /* ---- 유틸 ---- */
 function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
