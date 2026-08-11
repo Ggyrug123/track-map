@@ -27,7 +27,9 @@
     stroke-linecap:round;stroke-linejoin:round}
 
   .app{display:flex;flex-direction:column;height:100vh;max-width:520px;margin:0 auto;
-    position:relative;background:var(--surface);box-shadow:var(--shadow)}
+    position:relative;background:var(--surface);box-shadow:var(--shadow);
+    opacity:0;pointer-events:none;transition:opacity .25s}
+  .app.ready{opacity:1;pointer-events:auto}
 
   header{padding:14px 18px 12px;background:var(--surface);z-index:600;flex:none;border-bottom:1px solid var(--line)}
   .app-row{display:flex;align-items:center;justify-content:space-between}
@@ -361,15 +363,21 @@ async function logout(){
   currentUser=null; state.pins=[]; if(map) renderPins();
   toast('로그아웃했어요');
 }
-function showAuth(){ currentUser=null; document.getElementById('auth').classList.add('show'); }
+function showAuth(){
+  currentUser=null;
+  document.querySelector('.app').classList.remove('ready');
+  document.getElementById('auth').classList.add('show');
+}
 async function applySession(session){
   if(session && session.user){
     if(currentUser===session.user.id) return;
     currentUser=session.user.id;
     document.getElementById('auth').classList.remove('show');
+    document.querySelector('.app').classList.add('ready');
     await loadPins();
     renderPins();
     if(map) map.invalidateSize();
+    initAmbientWeather();
     if(!localStorage.getItem(ONBOARD_KEY)) setTimeout(showOnboarding,400);
   }else{
     showAuth();
@@ -526,6 +534,7 @@ function openAddForm(latlng, editId){
   document.querySelectorAll('#rate .ic').forEach(s=>s.classList.toggle('on',+s.dataset.i<=formData.rating));
   renderPhotoPreviews();
   syncSeason();
+  if(editingId==null) reverseGeocode(latlng);   // 지도에서 찍은 위치 자동 입력
 }
 const wopt=(v,ko)=>`<div class="opt ${v==='clear'?'on':''}" data-w="${v}" onclick="pickWeather('${v}')">${weatherIcon(v)}<span>${ko}</span></div>`;
 function weatherIcon(v){
@@ -643,6 +652,42 @@ async function autoWeather(manual){
     const w=wmoToWeather(code); pickWeather(w);
     if(note)note.textContent='자동 인식: '+WEATHER_KO[w]+' · 그날 그곳 날씨 기준';
   }catch(e){ if(note)note.textContent='날씨 조회 실패 — 직접 골라주세요.'; }
+}
+
+/* ---- 접속 시점 현재 날씨로 지도 테마 자동 설정 (2번) ---- */
+function initAmbientWeather(){
+  const apply=(lat,lng)=>{
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=weather_code`)
+      .then(r=>r.json()).then(j=>{
+        const code=j&&j.current?j.current.weather_code:null;
+        if(code==null)return;
+        const w=wmoToWeather(code);
+        setWeather(w==='cloudy'?'clear':w);
+      }).catch(()=>{});
+  };
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      pos=>apply(pos.coords.latitude,pos.coords.longitude),
+      ()=>apply(37.5665,126.9780),   // 위치 거부 시 서울 기준
+      {timeout:6000,maximumAge:600000}
+    );
+  }else{ apply(37.5665,126.9780); }
+}
+
+/* ---- 지도에서 직접 찍은 위치 → 장소 이름 자동 채우기 (3번) ---- */
+async function reverseGeocode(latlng){
+  const loc=document.getElementById('f_loc'); const note=document.getElementById('geoNote');
+  if(!loc)return;
+  if(note){note.textContent='이 위치의 장소 이름 확인 중…'; note.style.color='var(--ink-soft)';}
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&accept-language=ko&zoom=16`);
+    const j=await r.json();
+    const short=((j&&j.display_name)||'').split(',').slice(0,3).join(', ');
+    if(short){
+      loc.value=short;
+      if(note){note.innerHTML='이 위치로 찍혀요 — <span style="color:var(--ink-soft)">'+esc(short)+'</span>'; note.style.color='var(--clay-deep)';}
+    }else if(note){ note.textContent='위치 이름을 못 찾았어요. 직접 적어도 돼요.'; }
+  }catch(e){ if(note)note.textContent='위치 확인 실패 — 직접 적어도 돼요.'; }
 }
 
 /* ---- 저장 (클라우드, 추가/수정 공용) ---- */
