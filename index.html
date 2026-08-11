@@ -395,7 +395,7 @@ async function loadPins(){
 function initMap(){
   map=L.map('map',{zoomControl:true,attributionControl:false}).setView([36.3,127.8],7);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd'}).addTo(map);
-  map.on('click',e=>{ if(currentUser) openAddForm(e.latlng); });
+  map.on('click',e=>{ if(currentUser) openAddForm(e.latlng, null, true); });
   renderPins();
 }
 function renderPins(){
@@ -462,7 +462,7 @@ function closeSheet(){
 
 /* ---- 핀 추가/수정 폼 ---- */
 function quickAdd(){ if(currentUser) openAddForm(map.getCenter()); }
-function openAddForm(latlng, editId){
+function openAddForm(latlng, editId, autoLoc){
   pendingLatLng=latlng;
   editingId = (editId!=null)?editId:null;
   suggestList=[];
@@ -534,7 +534,7 @@ function openAddForm(latlng, editId){
   document.querySelectorAll('#rate .ic').forEach(s=>s.classList.toggle('on',+s.dataset.i<=formData.rating));
   renderPhotoPreviews();
   syncSeason();
-  if(editingId==null) reverseGeocode(latlng);   // 지도에서 찍은 위치 자동 입력
+  if(editingId==null && autoLoc) reverseGeocode(latlng);   // 지도에서 직접 클릭한 경우에만 위치 자동 입력
 }
 const wopt=(v,ko)=>`<div class="opt ${v==='clear'?'on':''}" data-w="${v}" onclick="pickWeather('${v}')">${weatherIcon(v)}<span>${ko}</span></div>`;
 function weatherIcon(v){
