@@ -246,15 +246,20 @@
 
   #cardStage{position:fixed;left:-99999px;top:0}
   .share-card{width:480px;background:var(--surface);border:1px solid var(--line);border-radius:24px;overflow:hidden;font-family:inherit}
-  .sc-photo{height:300px;background-size:cover;background-position:center}
-  .sc-body{padding:22px 24px 24px}
-  .sc-chips{display:flex;gap:8px;margin-bottom:12px}
-  .sc-chips span{font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;
-    background:var(--surface-2);border:1px solid var(--line);color:var(--clay-deep)}
-  .sc-title{font-size:26px;font-weight:800;letter-spacing:-.02em}
-  .sc-date{font-size:14px;color:var(--ink-soft);margin-top:6px}
-  .sc-note{font-size:15px;color:#5b5043;line-height:1.7;margin-top:16px}
-  .sc-brand{display:flex;align-items:center;gap:8px;margin-top:22px;font-size:13px;font-weight:700;color:var(--clay-deep)}
+  .sc-photo{height:300px;background-size:cover;background-position:center;background-color:#D8C2A6;display:grid;place-items:center}
+  .sc-ph-ic{width:62px;height:62px;fill:none;stroke:rgba(255,255,255,.8);stroke-width:1.3}
+  .sc-body{padding:22px 24px 22px;position:relative}
+  .sc-chips{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .sc-chip{font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--clay-deep)}
+  .sc-title{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+  .sc-loc{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink-soft);margin-top:9px}
+  .sc-pin{width:15px;height:15px;fill:none;stroke:var(--clay);stroke-width:1.7;flex:none}
+  .sc-stars{display:flex;gap:3px;margin-top:13px}
+  .sc-stars svg{width:19px;height:19px;fill:#E4D9C6;stroke:none}
+  .sc-stars svg.on{fill:var(--clay)}
+  .sc-note{font-size:15px;color:#5b5043;line-height:1.7;margin-top:16px;padding-left:14px;border-left:3px solid var(--clay)}
+  .sc-meta{font-size:12.5px;color:var(--ink-soft);margin-top:14px}
+  .sc-brand{display:flex;align-items:center;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;font-weight:700;color:var(--clay-deep)}
   .sc-brand .dot{width:9px;height:9px;border-radius:50%;background:var(--clay)}
 
   /* 로그인 화면 */
@@ -884,12 +889,14 @@ function shareCard(id){
   const photo=(p.photos&&p.photos[0])||'';
   document.getElementById('cardStage').innerHTML=`
     <div class="share-card" id="theCard">
-      <div class="sc-photo" style="${photo?`background-image:url(${photo})`:'background:linear-gradient(160deg,#D8C2A6,#C9AE8A)'}"></div>
+      <div class="sc-photo" style="${photo?`background-image:url(${photo})`:''}">${photo?'':`<svg class="sc-ph-ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>`}</div>
       <div class="sc-body">
-        <div class="sc-chips"><span>${WEATHER_KO[p.weather]||'맑음'}</span><span>${SEASON_KO[s]}</span></div>
+        <div class="sc-chips"><span class="sc-chip">${WEATHER_KO[p.weather]||'맑음'}</span><span class="sc-chip">${SEASON_KO[s]}</span>${p.mood?`<span class="sc-chip">${esc(p.mood)}</span>`:''}</div>
         <div class="sc-title">${esc(p.name)}</div>
-        <div class="sc-date">${[esc(p.locName)||regionGuess(p),p.date].filter(Boolean).join(' · ')}</div>
+        <div class="sc-loc"><svg class="sc-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>${[esc(p.locName)||regionGuess(p),p.date].filter(Boolean).join(' · ')}</div>
+        ${p.rating?`<div class="sc-stars">${[1,2,3,4,5].map(i=>`<svg viewBox="0 0 24 24" class="${i<=p.rating?'on':''}"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/></svg>`).join('')}</div>`:''}
         ${p.note?`<div class="sc-note">${esc(p.note)}</div>`:''}
+        ${(p.who||p.days||p.food)?`<div class="sc-meta">${[p.who?('함께 '+esc(p.who)):'',p.days?esc(p.days):'',p.food?esc(p.food):''].filter(Boolean).join('  ·  ')}</div>`:''}
         <div class="sc-brand"><span class="dot"></span> 내 여행 지도</div>
       </div>
     </div>`;
@@ -1456,10 +1463,22 @@ async function showSharedTrip(id){
           ${(day.places||[]).length?day.places.map((pl,pi)=>`
             <div class="day-place" style="cursor:default">
               <div class="dp-body"><div class="dp-name">${pi+1}. ${esc(pl.name)}</div>${pl.note?`<div class="dp-note">${esc(pl.note)}</div>`:''}</div>
-            </div>`).join(''):'<div class="day-empty">장소 없음</div>'}
+            </div>${pi<day.places.length-1?`<div class="leg" id="sleg-${i}-${pi}"><span>이동 정보…</span></div>`:''}`).join(''):'<div class="day-empty">장소 없음</div>'}
         </div>`).join('')}
       <a class="savebtn" style="display:block;text-align:center;text-decoration:none;margin-top:18px" href="${location.pathname}">나도 내 여행 지도 만들기</a>
     </div>`;
+  computeSharedLegs(t);
+}
+function computeSharedLegs(t){
+  (t.days||[]).forEach((day,di)=>{
+    for(let pi=0; pi<(day.places||[]).length-1; pi++){
+      const a=day.places[pi], b=day.places[pi+1];
+      const el=document.getElementById(`sleg-${di}-${pi}`);
+      if(!el)continue;
+      if(typeof a.lat!=='number'||typeof b.lat!=='number'){ el.innerHTML=legHtml(null); continue; }
+      fetchLeg(a,b,el);
+    }
+  });
 }
 
 /* ---- 유틸 ---- */
