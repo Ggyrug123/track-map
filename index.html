@@ -208,6 +208,21 @@
     border:1px solid var(--line);background:var(--surface);color:var(--ink-soft)}
   .gchip.on{background:var(--clay);color:#fff;border-color:var(--clay)}
 
+  /* 여행 일정(Day) */
+  .day-block{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:12px}
+  .day-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .day-badge{font-size:12px;font-weight:800;color:#fff;background:var(--clay);border-radius:8px;padding:3px 10px}
+  .day-date{font-size:11.5px;color:var(--ink-soft)}
+  .day-place{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin-bottom:6px}
+  .day-place .dp-body{flex:1;min-width:0}
+  .day-place .dp-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .day-place .dp-note{font-size:11px;color:var(--ink-soft);margin-top:2px;line-height:1.45}
+  .day-place .dp-memo{border:1px solid var(--line);background:var(--surface-2);color:var(--clay-deep);
+    font-size:10.5px;font-weight:700;font-family:inherit;border-radius:8px;padding:4px 9px;cursor:pointer;flex:none}
+  .day-place .dp-rm{border:none;background:none;color:var(--ink-soft);cursor:pointer;padding:2px;display:grid;place-items:center;flex:none}
+  .day-empty{font-size:12px;color:var(--ink-soft);padding:4px 2px 8px}
+  .day-add{width:100%;background:var(--surface);border:1px dashed #d8c7ac;color:var(--clay-deep);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:2px}
+
   #cardStage{position:fixed;left:-99999px;top:0}
   .share-card{width:480px;background:var(--surface);border:1px solid var(--line);border-radius:24px;overflow:hidden;font-family:inherit}
   .sc-photo{height:300px;background-size:cover;background-position:center}
@@ -295,7 +310,7 @@
   <div class="tabbar">
     <div class="tab on"><svg class="ic" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>지도</div>
     <div class="tab" onclick="showList()"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 10h16M9 5v14"/></svg>기록</div>
-    <div class="tab dis"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>계획<span class="badge2">2단계</span></div>
+    <div class="tab" onclick="showPlan()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>계획</div>
     <div class="tab" onclick="showBadges()"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M9 14l-2 7 5-3 5 3-2-7"/></svg>성취</div>
   </div>
 </div>
@@ -333,10 +348,10 @@ const SEASON_COLOR={spring:'#E2A9B6',summer:'#86B392',autumn:'#D69A57',winter:'#
 const SEASON_KO={spring:'봄',summer:'여름',autumn:'가을',winter:'겨울'};
 const WEATHER_KO={clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'};
 
-let state={pins:[]};
+let state={pins:[],trips:[]};
 let map, markers={}, pendingLatLng=null, currentWeather='clear';
 let editingId=null, formPhotos=[], formData={type:'record',weather:'clear',rating:0};
-let suggestList=[], locTimer=null, currentUser=null, currentGoal=null;
+let suggestList=[], locTimer=null, currentUser=null, currentGoal=null, recList=[];
 const GOALS={
   near:{title:'이번 달, 근교 한 곳 다녀오기'},
   new3:{title:'이번 분기, 새 지역 3곳'},
@@ -412,6 +427,7 @@ async function applySession(session){
     const meta=session.user.user_metadata||{};
     currentGoal=meta.goal||null;
     await loadPins();
+    await loadTrips();
     renderPins();
     if(map) map.invalidateSize();
     initAmbientWeather();
@@ -426,6 +442,11 @@ async function loadPins(){
   const {data,error}=await sb.from('travel_pins').select('id,data,created_at').order('created_at',{ascending:true});
   if(error){ console.error(error); toast('불러오기 실패: '+error.message); state.pins=[]; return; }
   state.pins=(data||[]).map(r=>Object.assign({id:r.id}, r.data||{}));
+}
+async function loadTrips(){
+  const {data,error}=await sb.from('travel_trips').select('id,data,created_at').order('created_at',{ascending:true});
+  if(error){ console.error('trips:',error.message); state.trips=[]; return; }
+  state.trips=(data||[]).map(r=>Object.assign({id:r.id}, r.data||{}));
 }
 
 /* ---------------- 지도 ---------------- */
@@ -977,6 +998,298 @@ async function setGoal(g){
   currentGoal=g; renderGoal(); showBadges();
   try{ await sb.auth.updateUser({data:{onboarded:true, goal:g}}); }catch(e){}
   toast('목표를 바꿨어요');
+}
+
+/* ---- 계획 탭 (가고 싶은 곳 + 추천) ---- */
+function showPlan(){
+  if(!currentUser)return;
+  const trips=state.trips||[];
+  const plans=state.pins.filter(p=>p.type==='plan');
+  openSheet(`
+    <h3>여행 계획</h3>
+    <div class="sub">여행을 만들어 날짜별로 짜고, 가고 싶은 곳도 모아요.</div>
+    <button class="savebtn" style="margin-top:2px" onclick="createTripForm()">+ 새 여행 만들기</button>
+
+    <label class="fld">내 여행 (${trips.length})</label>
+    ${trips.length?trips.map(t=>`
+      <div class="goal" onclick="openTrip('${t.id}')">
+        <div class="gi"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></div>
+        <div><div class="gt">${esc(t.name)}</div><div class="gd">${t.start} ~ ${t.end} · ${(t.days||[]).length}일</div></div>
+      </div>`).join(''):'<div class="note-box">아직 여행이 없어요. "새 여행 만들기"로 시작해보세요.</div>'}
+
+    <label class="fld">가고 싶은 곳 (${plans.length})</label>
+    ${plans.length?plans.map(p=>`
+      <div class="goal" onclick="closeSheet();setTimeout(()=>{map.flyTo([${p.lat},${p.lng}],10);openDetail('${p.id}')},300)">
+        <div class="gi"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg></div>
+        <div><div class="gt">${esc(p.name)}</div><div class="gd">${esc(p.locName)||'가고 싶은 곳'}</div></div>
+      </div>`).join(''):'<div class="note-box" style="margin-bottom:8px">아직 없어요. 아래에서 추천받거나 직접 추가해보세요.</div>'}
+    <button class="ghostbtn" onclick="closeSheet();setTimeout(quickAddPlan,250)">가고 싶은 곳 직접 추가</button>
+
+    <label class="fld">이 근처 가볼 만한 곳 추천</label>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="rec_loc" placeholder="예) 경주, 강릉, 전주" onkeydown="if(event.key==='Enter'){event.preventDefault();fetchRecommend();}" />
+      <button type="button" class="searchbtn" onclick="fetchRecommend()">추천</button>
+    </div>
+    <div id="recResult" style="margin-top:10px"></div>
+  `);
+}
+function quickAddPlan(){
+  if(!currentUser)return;
+  openAddForm(map.getCenter());
+  pickType('plan');
+}
+async function fetchRecommend(){
+  const q=document.getElementById('rec_loc').value.trim();
+  const box=document.getElementById('recResult');
+  if(!q){box.innerHTML='<div class="sg-msg">지역 이름을 입력해 주세요.</div>';return;}
+  box.innerHTML='<div class="sg-msg">추천 찾는 중…</div>';
+  try{
+    let gr=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ko&countrycodes=kr&q='+encodeURIComponent(q));
+    let gj=await gr.json();
+    if(!gj.length){ gr=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ko&q='+encodeURIComponent(q)); gj=await gr.json(); }
+    if(!gj.length){box.innerHTML='<div class="sg-msg">지역을 못 찾았어요.</div>';return;}
+    const lat=parseFloat(gj[0].lat), lng=parseFloat(gj[0].lon);
+    const wr=await fetch(`https://ko.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}%7C${lng}&gsradius=10000&gslimit=20&format=json&origin=*`);
+    const wj=await wr.json();
+    const items=(wj&&wj.query&&wj.query.geosearch)||[];
+    recList=items.map(it=>({name:it.title,lat:it.lat,lng:it.lon}));
+    if(!recList.length){box.innerHTML='<div class="sg-msg">추천할 곳을 못 찾았어요. 다른 지역으로 검색해보세요.</div>';return;}
+    box.innerHTML=recList.map((r,i)=>`
+      <div class="sg-item" style="justify-content:space-between;gap:8px">
+        <span style="display:flex;align-items:center;gap:8px;overflow:hidden;min-width:0">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span>
+        </span>
+        <button type="button" class="gchip" style="flex:none" onclick="addRecommend(${i})">+ 추가</button>
+      </div>`).join('');
+  }catch(e){ box.innerHTML='<div class="sg-msg">추천 조회 실패 — 인터넷 연결을 확인하세요.</div>'; }
+}
+let recPick=null;
+function addRecommend(i){ const r=recList[i]; if(!r)return; recPick=r; recChooser(); }
+function recChooser(){
+  const r=recPick; if(!r)return;
+  const trips=state.trips||[];
+  openSheet(`
+    <h3>어디에 추가할까요?</h3>
+    <div class="sub">${esc(r.name)}</div>
+    <button class="savebtn" style="margin-top:2px" onclick="recToWishlist()">가고 싶은 곳에 추가</button>
+    <label class="fld">여행 일정에 추가</label>
+    ${trips.length?trips.map(t=>`
+      <div class="goal" onclick="recChooseTrip('${t.id}')">
+        <div class="gi"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></div>
+        <div><div class="gt">${esc(t.name)}</div><div class="gd">${t.start} ~ ${t.end} · ${(t.days||[]).length}일</div></div>
+      </div>`).join(''):'<div class="note-box">아직 만든 여행이 없어요. 먼저 여행을 만들거나 "가고 싶은 곳"에 담아두세요.</div>'}
+    <button class="ghostbtn" onclick="showPlan()">← 계획으로</button>
+  `);
+}
+async function recToWishlist(){
+  if(!recPick)return;
+  const r=recPick;
+  const p={name:r.name,locName:r.name,lat:r.lat,lng:r.lng,type:'plan',photos:[],note:''};
+  try{
+    const {data,error}=await sb.from('travel_pins').insert({user_id:currentUser,data:pinPayload(p)}).select('id').single();
+    if(error)throw error;
+    p.id=data.id; state.pins.push(p); recPick=null;
+    renderPins(); closeSheet();
+    map.flyTo([p.lat,p.lng], Math.max(map.getZoom(),9));
+    toast('가고 싶은 곳에 추가했어요');
+  }catch(e){ toast('추가 실패 — '+(e.message||'다시 시도')); }
+}
+function recChooseTrip(tripId){
+  const t=state.trips.find(x=>x.id===tripId); if(!t||!recPick)return;
+  if((t.days||[]).length<=1){ recAddToTripDay(tripId,0); return; }
+  openSheet(`
+    <h3>며칠차에 추가할까요?</h3>
+    <div class="sub">${esc(recPick.name)} · ${esc(t.name)}</div>
+    ${t.days.map((d,i)=>`<button class="savebtn" style="margin-top:8px" onclick="recAddToTripDay('${tripId}',${i})">${i+1}일차 · ${tripDayDate(t,i)}</button>`).join('')}
+    <button class="ghostbtn" onclick="recChooser()">← 뒤로</button>
+  `);
+}
+function recAddToTripDay(tripId,dayIdx){
+  if(!recPick)return;
+  tripAddCtx={tripId,dayIdx};
+  pendingTripPlace={name:recPick.name, locName:recPick.name, lat:recPick.lat, lng:recPick.lng, note:''};
+  recPick=null;
+  openSheet(`
+    <h3>${dayIdx+1}일차에 추가</h3>
+    <div class="sub">${esc(pendingTripPlace.name)}</div>
+    <label class="fld">메모 (선택)</label>
+    <textarea id="tp_note" placeholder="예) 오전 방문, 입장료 확인"></textarea>
+    <button class="savebtn" onclick="confirmTripPlace()">이 날에 추가</button>
+    <button class="ghostbtn" onclick="openTrip('${tripId}')">← 일정으로</button>
+  `);
+}
+
+/* ---- 여행(트립) 일정 ---- */
+function tripPayload(t){ const o=Object.assign({},t); delete o.id; return o; }
+function tripDayDate(t,i){
+  const [y,m,d]=t.start.split('-').map(Number);
+  const dt=new Date(y,m-1,d+i);
+  const mm=String(dt.getMonth()+1).padStart(2,'0'), dd=String(dt.getDate()).padStart(2,'0');
+  return `${dt.getFullYear()}-${mm}-${dd}`;
+}
+function createTripForm(){
+  const today=new Date().toISOString().slice(0,10);
+  openSheet(`
+    <h3>새 여행 만들기</h3>
+    <div class="sub">날짜를 정하면 1일차·2일차가 자동으로 만들어져요.</div>
+    <label class="fld">여행 이름</label>
+    <input type="text" id="t_name" placeholder="예) 경주 2박 3일" />
+    <label class="fld">시작 날짜</label>
+    <input type="date" id="t_start" value="${today}" />
+    <label class="fld">끝 날짜</label>
+    <input type="date" id="t_end" value="${today}" />
+    <button class="savebtn" onclick="saveTrip()">여행 만들기</button>
+    <button class="ghostbtn" onclick="showPlan()">취소</button>
+  `);
+}
+async function saveTrip(){
+  const name=document.getElementById('t_name').value.trim()||'이름 없는 여행';
+  const start=document.getElementById('t_start').value;
+  const end=document.getElementById('t_end').value;
+  if(!start||!end){toast('날짜를 정해주세요');return;}
+  if(end<start){toast('끝 날짜가 시작보다 빨라요');return;}
+  const n=Math.round((new Date(end)-new Date(start))/86400000)+1;
+  const days=[]; for(let i=0;i<n;i++) days.push({places:[]});
+  const trip={name,start,end,days};
+  try{
+    const {data,error}=await sb.from('travel_trips').insert({user_id:currentUser,data:trip}).select('id').single();
+    if(error)throw error;
+    trip.id=data.id; state.trips.push(trip);
+    openTrip(trip.id); toast('여행을 만들었어요');
+  }catch(e){ toast('여행 생성 실패 — '+(e.message||'다시 시도')); }
+}
+function openTrip(id){
+  const t=state.trips.find(x=>x.id===id); if(!t)return;
+  openSheet(`
+    <h3>${esc(t.name)}</h3>
+    <div class="sub">${t.start} ~ ${t.end} · ${t.days.length}일</div>
+    ${t.days.map((day,i)=>`
+      <div class="day-block">
+        <div class="day-head"><span class="day-badge">${i+1}일차</span><span class="day-date">${tripDayDate(t,i)}</span></div>
+        ${day.places.length?day.places.map((pl,pi)=>`
+          <div class="day-place">
+            <svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--clay);flex:none"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <div class="dp-body"><div class="dp-name">${esc(pl.name)}</div>${pl.note?`<div class="dp-note">${esc(pl.note)}</div>`:''}</div>
+            <button class="dp-memo" onclick="editTripPlaceNote('${t.id}',${i},${pi})">메모</button>
+            <button class="dp-rm" onclick="removeTripPlace('${t.id}',${i},${pi})">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>`).join(''):'<div class="day-empty">아직 장소가 없어요</div>'}
+        <button class="day-add" onclick="addPlaceToDay('${t.id}',${i})">+ 장소 추가</button>
+      </div>`).join('')}
+    <button class="savebtn" onclick="convertTripToRecords('${t.id}')">다녀왔어요 · 기록으로 남기기</button>
+    <button class="ghostbtn" onclick="showPlan()">← 계획으로</button>
+    <button class="ghostbtn" onclick="deleteTrip('${t.id}')">여행 삭제</button>
+  `);
+}
+let tripAddCtx=null, pendingTripPlace=null;
+function addPlaceToDay(tripId, dayIdx){
+  tripAddCtx={tripId,dayIdx};
+  openSheet(`
+    <h3>${dayIdx+1}일차에 장소 추가</h3>
+    <label class="fld">장소 검색</label>
+    <input type="text" id="tp_loc" placeholder="예) 불국사, 첨성대" autocomplete="off" oninput="onTripLocInput()" onkeydown="if(event.key==='Enter')event.preventDefault()" />
+    <div class="suggest" id="tpSuggest"></div>
+    <button class="ghostbtn" onclick="openTrip('${tripId}')">← 일정으로</button>
+  `);
+}
+function onTripLocInput(){
+  const q=document.getElementById('tp_loc').value.trim();
+  clearTimeout(locTimer);
+  const box=document.getElementById('tpSuggest');
+  if(q.length<2){box.innerHTML='';return;}
+  locTimer=setTimeout(()=>tripFetchSuggest(q),350);
+}
+async function tripFetchSuggest(q){
+  const box=document.getElementById('tpSuggest'); if(!box)return;
+  box.innerHTML='<div class="sg-msg">검색 중…</div>';
+  const base='https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=ko&q=';
+  try{
+    let res=await fetch(base+encodeURIComponent(q)+'&countrycodes=kr'); let j=await res.json();
+    if(!j.length){ res=await fetch(base+encodeURIComponent(q)); j=await res.json(); }
+    suggestList=j.slice(0,4).map(r=>({lat:parseFloat(r.lat),lng:parseFloat(r.lon),short:(r.display_name||'').split(',').slice(0,3).join(', ')}));
+    if(!suggestList.length){box.innerHTML='<div class="sg-msg">결과가 없어요.</div>';return;}
+    box.innerHTML=suggestList.map((r,i)=>`<div class="sg-item" onclick="pickTripPlace(${i})"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.2"/></svg><span>${esc(r.short)}</span></div>`).join('');
+  }catch(e){box.innerHTML='<div class="sg-msg">검색 실패 — 인터넷 확인.</div>';}
+}
+function pickTripPlace(i){
+  const r=suggestList[i]; if(!r||!tripAddCtx)return;
+  pendingTripPlace={name:r.short.split(',')[0], locName:r.short, lat:r.lat, lng:r.lng, note:''};
+  const idx=tripAddCtx.dayIdx;
+  openSheet(`
+    <h3>${idx+1}일차에 추가</h3>
+    <div class="sub">${esc(pendingTripPlace.name)}</div>
+    <label class="fld">메모 (선택)</label>
+    <textarea id="tp_note" placeholder="예) 오전 방문, 입장료 확인, 근처 카페 들르기"></textarea>
+    <button class="savebtn" onclick="confirmTripPlace()">이 날에 추가</button>
+    <button class="ghostbtn" onclick="addPlaceToDay('${tripAddCtx.tripId}',${idx})">← 다시 검색</button>
+  `);
+}
+async function confirmTripPlace(){
+  if(!pendingTripPlace||!tripAddCtx)return;
+  const t=state.trips.find(x=>x.id===tripAddCtx.tripId); if(!t)return;
+  const idx=tripAddCtx.dayIdx;
+  pendingTripPlace.note=document.getElementById('tp_note').value.trim();
+  t.days[idx].places.push(pendingTripPlace);
+  try{ const {error}=await sb.from('travel_trips').update({data:tripPayload(t)}).eq('id',t.id); if(error)throw error; }
+  catch(e){ toast('추가 실패 — '+(e.message||'다시')); return; }
+  pendingTripPlace=null;
+  openTrip(t.id); toast((idx+1)+'일차에 추가했어요');
+}
+async function removeTripPlace(tripId,dayIdx,placeIdx){
+  const t=state.trips.find(x=>x.id===tripId); if(!t)return;
+  t.days[dayIdx].places.splice(placeIdx,1);
+  try{ const {error}=await sb.from('travel_trips').update({data:tripPayload(t)}).eq('id',t.id); if(error)throw error; }
+  catch(e){ toast('삭제 실패'); return; }
+  openTrip(t.id);
+}
+async function deleteTrip(id){
+  try{ const {error}=await sb.from('travel_trips').delete().eq('id',id); if(error)throw error; }
+  catch(e){ toast('삭제 실패'); return; }
+  state.trips=state.trips.filter(x=>x.id!==id); showPlan(); toast('여행을 삭제했어요');
+}
+function editTripPlaceNote(tripId,dayIdx,placeIdx){
+  const t=state.trips.find(x=>x.id===tripId); if(!t)return;
+  const pl=t.days[dayIdx].places[placeIdx]; if(!pl)return;
+  tripAddCtx={tripId,dayIdx,placeIdx};
+  openSheet(`
+    <h3>메모</h3>
+    <div class="sub">${esc(pl.name)}</div>
+    <textarea id="tp_note" placeholder="예) 오후 2시 예약, 주차 정보">${esc(pl.note||'')}</textarea>
+    <button class="savebtn" onclick="saveTripPlaceNote()">저장</button>
+    <button class="ghostbtn" onclick="openTrip('${tripId}')">← 일정으로</button>
+  `);
+}
+async function saveTripPlaceNote(){
+  if(!tripAddCtx)return;
+  const t=state.trips.find(x=>x.id===tripAddCtx.tripId); if(!t)return;
+  const pl=t.days[tripAddCtx.dayIdx].places[tripAddCtx.placeIdx]; if(!pl)return;
+  pl.note=document.getElementById('tp_note').value.trim();
+  try{ const {error}=await sb.from('travel_trips').update({data:tripPayload(t)}).eq('id',t.id); if(error)throw error; }
+  catch(e){ toast('저장 실패'); return; }
+  openTrip(t.id); toast('메모를 저장했어요');
+}
+async function convertTripToRecords(id){
+  const t=state.trips.find(x=>x.id===id); if(!t)return;
+  const rows=[];
+  t.days.forEach((day,i)=>{
+    const date=tripDayDate(t,i);
+    (day.places||[]).forEach(pl=>{
+      rows.push({user_id:currentUser, data:{name:pl.name, locName:pl.locName||pl.name, lat:pl.lat, lng:pl.lng,
+        type:'record', date, weather:'clear', rating:0, who:'', days:`${i+1}일차`, food:'', note:pl.note||'', photos:[]}});
+    });
+  });
+  if(!rows.length){ toast('여행에 장소가 없어요'); return; }
+  try{
+    const {data,error}=await sb.from('travel_pins').insert(rows).select('id,data');
+    if(error)throw error;
+    (data||[]).forEach(r=>state.pins.push(Object.assign({id:r.id}, r.data)));
+    await sb.from('travel_trips').delete().eq('id',t.id);
+    state.trips=state.trips.filter(x=>x.id!==t.id);
+    renderPins(); closeSheet();
+    toast(rows.length+'곳을 기록으로 남겼어요');
+  }catch(e){ toast('기록 전환 실패 — '+(e.message||'다시 시도')); }
 }
 
 /* ---- 유틸 ---- */
